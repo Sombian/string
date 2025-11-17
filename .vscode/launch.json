@@ -1,0 +1,24 @@
+{
+	"configurations":
+	[
+		{
+			"name": "UCRT",
+			// c++
+			"type": "cppdbg",
+			"request": "launch",
+			// cmake
+			"cwd": "${workspaceFolder}",
+			"program": "${command:cmake.launchTargetPath}",
+		},
+		{
+			"name": "MSVC",
+			// c++
+			"type": "cppvsdbg",
+			"request": "launch",
+			// cmake
+			"cwd": "${workspaceFolder}",
+			"program": "${command:cmake.launchTargetPath}",
+		},
+	],
+	"version": "0.2.0",
+}

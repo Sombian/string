@@ -1,0 +1,12 @@
+Index:
+    Background: Build
+    StandardLibrary: Yes
+
+InlayHints:
+    Designators: Off
+    DeducedTypes: Off
+    ParameterNames: Off
+
+Diagnostics:
+    UnusedIncludes: Strict
+    MissingIncludes: Strict

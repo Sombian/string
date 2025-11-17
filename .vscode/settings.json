@@ -1,0 +1,9 @@
+{
+	"files.exclude":
+	{
+		".vs": true,
+		"out": true,
+		"build": true,
+		".cache": true,
+	},
+}
