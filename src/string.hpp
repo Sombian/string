@@ -464,12 +464,7 @@ public:
 
 	COPY_PTR_LOGIC(c_str)
 	{
-		const auto max {from.size()};
-
-		if (dest.capacity() < max)
-		{
-			dest.capacity(max);
-		}
+		dest.capacity(from.size());
 
 		std::ranges::copy
 		(
@@ -478,7 +473,7 @@ public:
 			dest.store.head()
 		);
 		// fix invariant
-		dest.written(max);
+		dest.written(from.size());
 	}
 
 	SWAP_PTR_LOGIC(c_str)
@@ -576,21 +571,37 @@ public:
 	{
 		const auto size {lhs.size() + rhs.size()};
 
-		if (0 < size && lhs.capacity() < size - 1)
+		if (0 < rhs.size())
 		{
-			lhs.capacity(size - 1);
+			if (0 < lhs.size())
+			{
+				lhs.capacity(size - 1);
+
+				// overrides '\0'
+				std::ranges::copy
+				(
+					rhs.store.head(),
+					rhs.store.tail(),
+					&lhs.store.tail()[-1]
+				);
+				// fix invariant
+				lhs.written(size - 1);
+			}
+			else [[unlikely]]
+			{
+				lhs.capacity(size - 0);
+
+				// write from start
+				std::ranges::copy
+				(
+					rhs.store.head(),
+					rhs.store.tail(),
+					&lhs.store.head()[-0]
+				);
+				// fix invariant
+				lhs.written(size - 0);
+			}
 		}
-
-		// overrides '\0'
-		std::ranges::copy
-		(
-			rhs.store.head()   ,
-			rhs.store.tail()   ,
-			lhs.store.tail() - 1
-		);
-		// fix invariant
-		lhs.written(0 < size ? size - 1 : 0);
-
 		return lhs;
 	}
 	
@@ -598,44 +609,76 @@ public:
 	{
 		const auto size {lhs.size() + rhs.size()};
 
-		if (0 < size && lhs.capacity() < size - 1)
+		if (0 < rhs.size())
 		{
-			lhs.capacity(size - 1);
+			if (0 < lhs.size())
+			{
+				lhs.capacity(size - 1);
+
+				// overrides '\0'
+				std::ranges::copy
+				(
+					rhs.head,
+					rhs.tail,
+					&lhs.store.tail()[-1]
+				);
+				// fix invariant
+				lhs.written(size - 1);
+			}
+			else [[unlikely]]
+			{
+				lhs.capacity(size - 0);
+
+				// write from start
+				std::ranges::copy
+				(
+					rhs.head,
+					rhs.tail,
+					&lhs.store.head()[-0]
+				);
+				// fix invariant
+				lhs.written(size - 0);
+			}
 		}
-
-		// overrides '\0'
-		std::ranges::copy
-		(
-			rhs.head /*###*/   ,
-			rhs.tail /*###*/   ,
-			lhs.store.tail() - 1
-		);
-		// fix invariant
-		lhs.written(0 < size ? size - 1 : 0);
-
 		return lhs;
 	}
 
 	template<size_t N>
 	friend constexpr auto operator+=(c_str& lhs, const T (&rhs)[N]) noexcept -> c_str&
 	{
-		const auto size {lhs.size() + rhs.size()};
+		const auto size {lhs.size() + N};
 
-		if (0 < size && lhs.capacity() < size - 1)
+		if (0 < N - 1)
 		{
-			lhs.capacity(size - 1);
+			if (0 < lhs.size())
+			{
+				lhs.capacity(size - 1);
+
+				// overrides '\0'
+				std::ranges::copy
+				(
+					&rhs[0],
+					&rhs[N],
+					&lhs.store.tail()[-1]
+				);
+				// fix invariant
+				lhs.written(size - 1);
+			}
+			else [[unlikely]]
+			{
+				lhs.capacity(size - 0);
+
+				// write from start
+				std::ranges::copy
+				(
+					&rhs[0],
+					&rhs[N],
+					&lhs.store.head()[-0]
+				);
+				// fix invariant
+				lhs.written(size - 0);
+			}
 		}
-
-		// overrides '\0'
-		std::ranges::copy
-		(
-			&rhs[0] /*####*/   ,
-			&rhs[N] /*####*/   ,
-			lhs.store.tail() - 1
-		);
-		// fix invariant
-		lhs.written(0 < size ? size - 1 : 0);
-
 		return lhs;
 	}
 
@@ -1044,12 +1087,11 @@ IMPL constexpr auto c_str<T, A>::capacity(size_t value)       noexcept -> void
 		{
 			case LARGE:
 			{
-				// ...ignore it?
-				goto __MALLOC__;
+				// goto __MALLOC__;
 			}
 			case SMALL:
 			{
-				[[fallthrough]];
+				// [[fallthrough]];
 			}
 		}
 	}
@@ -2098,7 +2140,7 @@ IMPL constexpr auto c_str<T, A>::writer::operator=(char32_t code)&& noexcept -> 
 					&tail[0],
 					&head[b]
 				);
-				// ...fix invariant
+				// fix invariant
 				this->src->written(new_l);
 			}
 			else if (a > b)
@@ -2118,7 +2160,7 @@ IMPL constexpr auto c_str<T, A>::writer::operator=(char32_t code)&& noexcept -> 
 					&tail[0],
 					&head[b]
 				);
-				// ...fix invariant
+				// fix invariant
 				this->src->written(new_l);
 			}
 			// ♻️ set code point in place ♻️
