@@ -10,8 +10,8 @@
 #include <fstream>
 #include <optional>
 #include <algorithm>
-#include <filesystem>
 
+#include <cstdio>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -100,30 +100,6 @@ class c_str
 	{
 		SMALL = IS_BIG ? 0b0000000'0 : 0b0'0000000,
 		LARGE = IS_BIG ? 0b0000000'1 : 0b1'0000000,
-	};
-
-	class codec
-	{
-		// nothing to do...
-
-	public:
-
-		static constexpr auto size(char32_t code) noexcept -> int8_t
-		                        requires (!std::is_same_v<T, char>);
-
-		static constexpr auto next(const T* ptr) noexcept -> int8_t
-		                        requires (!std::is_same_v<T, char>);
-
-		static constexpr auto back(const T* ptr) noexcept -> int8_t
-		                        requires (!std::is_same_v<T, char>);
-
-		[[clang::always_inline]] static constexpr auto encode_ptr
-		(const char32_t in, T* out, int8_t width) noexcept -> void
-		                requires (!std::is_same_v<T, char>);
-
-		[[clang::always_inline]] static constexpr auto decode_ptr
-		(const T* in, char32_t& out, int8_t width) noexcept -> void
-		                requires (!std::is_same_v<T, char>);
 	};
 
 	class cursor
@@ -222,15 +198,15 @@ class c_str
 		// iterator
 
 		constexpr auto begin() const noexcept -> cursor;
-		constexpr auto begin()       noexcept -> cursor;
-
 		constexpr auto end() const noexcept -> cursor;
-		constexpr auto end()       noexcept -> cursor;
 
 		// subscript
 
-		constexpr auto operator[](size_t value) const noexcept -> reader;
-		constexpr auto operator[](size_t value)       noexcept -> writer;
+		constexpr auto operator[](size_t value) const noexcept -> const T& requires (std::is_same_v<T, char>);
+		constexpr auto operator[](size_t value)       noexcept -> const T& requires (std::is_same_v<T, char>);
+
+		constexpr auto operator[](size_t value) const noexcept -> reader requires (!std::is_same_v<T, char>);
+		constexpr auto operator[](size_t value)       noexcept -> writer requires (!std::is_same_v<T, char>);
 	};
 
 	// for c_str
@@ -385,6 +361,49 @@ class c_str
 
 public:
 
+	class codec
+	{
+		// nothing to do...
+
+	public:
+
+		codec() = delete;
+
+		static constexpr auto size(char32_t code) noexcept -> int8_t;
+
+		static constexpr auto next(const T* ptr) noexcept -> int8_t;
+
+		static constexpr auto back(const T* ptr) noexcept -> int8_t;
+
+		static constexpr auto encode_ptr(const char32_t in, T* out, int8_t size) noexcept -> void;
+
+		static constexpr auto decode_ptr(const T* in, char32_t& out, int8_t size) noexcept -> void;
+	};
+
+	// returns the content of a file with LF to CRLF normalization.
+	template<class S> friend auto file_of(const S& path) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
+	// returns the content of a file with LF to CRLF normalization.
+	template<size_t N> friend auto file_of(const char (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
+	// returns the content of a file with LF to CRLF normalization.
+	template<size_t N> friend auto file_of(const char8_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
+	// returns the content of a file with LF to CRLF normalization.
+	template<size_t N> friend auto file_of(const char16_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
+	// returns the content of a file with LF to CRLF normalization.
+	template<size_t N> friend auto file_of(const char32_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
+
+	// convertion
+
+	template<class U, class X> requires
+	(
+		!std::is_same_v<T, char>
+		&&
+		!std::is_same_v<U, char>
+	)
+	operator c_str<U, X>() const noexcept;
+	operator std::string() const noexcept;
+
+	// constructor
+
 	constexpr c_str() noexcept
 	{
 		assert(this->store.tag() == SMALL);
@@ -498,20 +517,6 @@ public:
 		from.store.__union__.large.size = 0;
 		from.store.__union__.large.meta = 0;
 	}
-
-	template<class U> requires
-	(
-		!std::is_same_v<T, char>
-		&&
-		!std::is_same_v<U, char>
-	)
-	operator c_str<U, A>() noexcept;
-
-	operator const char*() noexcept
-	requires (std::is_same_v<T, char>);
-
-	operator std::string() noexcept
-	requires (std::is_same_v<T, char>);
 	
 	// returns the number of code units, including NULL-TERMINATOR.
 	constexpr auto size() const noexcept -> size_t;
@@ -543,15 +548,15 @@ public:
 	// iterator
 
 	constexpr auto begin() const noexcept -> cursor;
-	constexpr auto begin()       noexcept -> cursor;
-
 	constexpr auto end() const noexcept -> cursor;
-	constexpr auto end()       noexcept -> cursor;
 
 	// subscript
 
-	constexpr auto operator[](size_t value) const noexcept -> reader;
-	constexpr auto operator[](size_t value)       noexcept -> writer;
+	constexpr auto operator[](size_t value) const noexcept -> const T& requires (std::is_same_v<T, char>);
+	constexpr auto operator[](size_t value)       noexcept ->       T& requires (std::is_same_v<T, char>);
+
+	constexpr auto operator[](size_t value) const noexcept -> reader requires (!std::is_same_v<T, char>);
+	constexpr auto operator[](size_t value)       noexcept -> writer requires (!std::is_same_v<T, char>);
 
 	// iostream
 	
@@ -943,19 +948,50 @@ requires                        \
     std::is_same_v<T, char32_t> \
 )                               \
 
-IMPL template<class U> requires (!std::is_same_v<T, char> && !std::is_same_v<U, char>) c_str<T, A>::operator c_str<U, A>() noexcept
+IMPL template<class U, class X> requires (!std::is_same_v<T, char> && !std::is_same_v<U, char>) c_str<T, A>::operator c_str<U, X>() const noexcept
 {
-	// TODO
+	c_str<U, X> str;
+	
+	if (0 < this->size())
+	{
+		const auto size {[&](){ size_t impl {0}; for (const auto code : *this) { impl += c_str<U, X>::codec::size(code); } return impl + 1; }()};
+
+		str.capacity(size);
+		str.written(size);
+
+		auto* ptr {reinterpret_cast<U*>(str.store.head())};
+
+		for (const auto code : *this)
+		{
+			const auto size {c_str<U, X>::codec::size(code)};
+			c_str<U, X>::codec::encode_ptr(code, ptr, size);
+			ptr += size;
+		}
+	}
+	return str;
 }
 
-IMPL c_str<T, A>::operator const char*() noexcept requires (std::is_same_v<T, char>) // backward compatibility for narrow char string
+IMPL /* backward compatibility. unfortunately, this requires re-encoding, from head to tail. */ c_str<T, A>::operator std::string() const noexcept
 {
-	// TODO
-}
+	std::string str;
 
-IMPL c_str<T, A>::operator std::string() noexcept requires (std::is_same_v<T, char>) // backward compatibility for narrow char string
-{
-	// TODO
+	if (0 < this->size())
+	{
+		const auto size {[&](){ size_t impl {0}; for (const auto code : *this) { impl += c_str<char8_t>::codec::size(code); } return impl + 0; }()};
+	
+		str.reserve(size);
+		str.resize(size);
+
+		auto* ptr {reinterpret_cast<char8_t*>(str.data())};
+
+		for (const auto code : *this)
+		{
+			const auto size {c_str<char8_t>::codec::size(code)};
+			c_str<char8_t>::codec::encode_ptr(code, ptr, size);
+			ptr += size;
+		}
+	}
+	return str;
 }
 
 #pragma region SSO
@@ -1043,7 +1079,7 @@ IMPL constexpr auto c_str<T, A>::storage::tail()       noexcept ->       T*
 
 #pragma region c_str
 
-IMPL constexpr auto c_str<T, A>::size(/* getter */) const noexcept -> size_t
+IMPL constexpr auto c_str<T, A>::size() const noexcept -> size_t
 {
 	return this->store.tag() == SMALL
 	       ?
@@ -1052,7 +1088,7 @@ IMPL constexpr auto c_str<T, A>::size(/* getter */) const noexcept -> size_t
 	       0x0 + (this->store.__union__.large.size >> 0x0);
 }
 
-IMPL constexpr auto c_str<T, A>::length(/* getter */) const noexcept -> size_t
+IMPL constexpr auto c_str<T, A>::length() const noexcept -> size_t
 {
 	if constexpr (std::is_same_v<T, char32_t>)
 	{
@@ -1408,27 +1444,27 @@ IMPL constexpr auto c_str<T, A>::begin() const noexcept -> cursor
 	return {this->store.head()};
 }
 
-IMPL constexpr auto c_str<T, A>::begin()       noexcept -> cursor
-{
-	return {this->store.head()};
-}
-
 IMPL constexpr auto c_str<T, A>::end() const noexcept -> cursor
 {
 	return {this->store.tail()};
 }
 
-IMPL constexpr auto c_str<T, A>::end()       noexcept -> cursor
+IMPL constexpr auto c_str<T, A>::operator[](size_t value) const noexcept -> const T& requires (std::is_same_v<T, char>)
 {
-	return {this->store.tail()};
+	return this->store.head()[value];
 }
 
-IMPL constexpr auto c_str<T, A>::operator[](size_t value) const noexcept -> reader
+IMPL constexpr auto c_str<T, A>::operator[](size_t value)       noexcept ->       T& requires (std::is_same_v<T, char>)
+{
+	return this->store.head()[value];
+}
+
+IMPL constexpr auto c_str<T, A>::operator[](size_t value) const noexcept -> reader requires (!std::is_same_v<T, char>)
 {
 	return {*this, value};
 }
 
-IMPL constexpr auto c_str<T, A>::operator[](size_t value)       noexcept -> writer
+IMPL constexpr auto c_str<T, A>::operator[](size_t value)       noexcept -> writer requires (!std::is_same_v<T, char>)
 {
 	return {*this, value};
 }
@@ -1695,8 +1731,8 @@ IMPL constexpr auto c_str<T, A>::slice::substr(size_t start, size_t until) const
 	{
 		until = std::min(start + until, max);
 
-		assert(&ptr[start] <= this->tail);
-		assert(&ptr[until] <= this->tail);
+		assert(&ptr[start] < this->tail);
+		assert(&ptr[until] < this->tail);
 
 		return {&ptr[start], &ptr[until]};
 	}
@@ -1715,8 +1751,8 @@ IMPL constexpr auto c_str<T, A>::slice::substr(size_t start, size_t until) const
 		bar += codec::next(&ptr[bar]);
 	}
 
-	assert(&ptr[bar] <= this->tail);
-	assert(&ptr[bar] <= this->tail);
+	assert(&ptr[foo] < this->tail);
+	assert(&ptr[bar] < this->tail);
 
 	return {&ptr[foo], &ptr[bar]};
 }
@@ -1726,27 +1762,27 @@ IMPL constexpr auto c_str<T, A>::slice::begin() const noexcept -> cursor
 	return {this->head};
 }
 
-IMPL constexpr auto c_str<T, A>::slice::begin()       noexcept -> cursor
-{
-	return {this->head};
-}
-
 IMPL constexpr auto c_str<T, A>::slice::end() const noexcept -> cursor
 {
 	return {this->tail};
 }
 
-IMPL constexpr auto c_str<T, A>::slice::end()       noexcept -> cursor
+IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value) const noexcept -> const T& requires (std::is_same_v<T, char>)
 {
-	return {this->tail};
+	return this->head[value];
 }
 
-IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value) const noexcept -> reader
+IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value)       noexcept -> const T& requires (std::is_same_v<T, char>)
+{
+	return this->head[value];
+}
+
+IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value) const noexcept -> reader requires (!std::is_same_v<T, char>)
 {
 	return {*this, value};
 }
 
-IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value)       noexcept -> writer
+IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value)       noexcept -> writer requires (!std::is_same_v<T, char>)
 {
 	return {*this, value};
 }
@@ -1755,16 +1791,16 @@ IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value)       noexcept 
 
 #pragma region c_str::codec
 
-IMPL constexpr auto c_str<T, A>::codec::size(char32_t code) noexcept -> int8_t requires (!std::is_same_v<T, char>)
+IMPL constexpr auto c_str<T, A>::codec::size(char32_t code) noexcept -> int8_t
 {
-	if constexpr (std::is_same_v<T, char32_t>)
+	if constexpr (std::is_same_v<T, char>)
 	{
 		return 1;
 	}
-
 	if constexpr (std::is_same_v<T, char8_t>)
 	{
-		const auto N {std::bit_width(static_cast<uint32_t>(code))};
+		const auto N {std::bit_width
+		(static_cast<uint32_t>(code))};
 
 		//|-----------------------|
 		//| U+000000 ... U+00007F | -> 1 code unit
@@ -1775,7 +1811,6 @@ IMPL constexpr auto c_str<T, A>::codec::size(char32_t code) noexcept -> int8_t r
 
 		return 1 + (8 <= N) + (12 <= N) + (17 <= N);
 	}
-
 	if constexpr (std::is_same_v<T, char16_t>)
 	{
 		//|-----------------------|
@@ -1786,9 +1821,13 @@ IMPL constexpr auto c_str<T, A>::codec::size(char32_t code) noexcept -> int8_t r
 
 		return 1 + (0xFFFF /* surrogate */ < code);
 	}
+	if constexpr (std::is_same_v<T, char32_t>)
+	{
+		return 1;
+	}
 }
 
-IMPL constexpr auto c_str<T, A>::codec::next(const T* ptr) noexcept -> int8_t requires (!std::is_same_v<T, char>)
+IMPL constexpr auto c_str<T, A>::codec::next(const T* ptr) noexcept -> int8_t
 {
 	constexpr static const int8_t TABLE[]
 	{
@@ -1802,51 +1841,54 @@ IMPL constexpr auto c_str<T, A>::codec::next(const T* ptr) noexcept -> int8_t re
 		/*| 0xE |*/ 3, /*| 0xF |*/ 4,
 	};
 
-	if constexpr (std::is_same_v<T, char32_t>)
+	if constexpr (std::is_same_v<T, char>)
 	{
 		return 1;
 	}
-
 	if constexpr (std::is_same_v<T, char8_t>)
 	{
 		// branchless programming for utf-8
 		return TABLE[(ptr[0] >> 0x4) & 0x0F];
 	}
-
 	if constexpr (std::is_same_v<T, char16_t>)
 	{
 		// branchless programming for utf-16
 		return 1 + ((ptr[0] >> 0xA) == 0x36);
 	}
+	if constexpr (std::is_same_v<T, char32_t>)
+	{
+		return 1;
+	}
 }
 
-IMPL constexpr auto c_str<T, A>::codec::back(const T* ptr) noexcept -> int8_t requires (!std::is_same_v<T, char>)
+IMPL constexpr auto c_str<T, A>::codec::back(const T* ptr) noexcept -> int8_t
 {
+	if constexpr (std::is_same_v<T, char>)
+	{
+		return -1;
+	}
+	if constexpr (std::is_same_v<T, char8_t>)
+	{
+		// walk backward until non-continuation code unit is found
+		int8_t i {-1}; for (; (ptr[i] & 0xC0) == 0x80; --i) {} return i;
+	}
+	if constexpr (std::is_same_v<T, char16_t>)
+	{
+		// walk backward until encountering leading surrogate is found
+		int8_t i {-1}; for (; (ptr[i] >> 0xA) == 0x37; --i) {} return i;
+	}
 	if constexpr (std::is_same_v<T, char32_t>)
 	{
 		return -1;
 	}
-
-	if constexpr (std::is_same_v<T, char8_t>)
-	{
-		// walk backward until non-continuation code unit is found
-		int8_t i {-1}; for (; (ptr[i] & 0xC0) == 0x80; --i); return i;
-	}
-
-	if constexpr (std::is_same_v<T, char16_t>)
-	{
-		// walk backward until encountering leading surrogate is found
-		int8_t i {-1}; for (; (ptr[i] >> 0xA) == 0x37; --i); return i;
-	}
 }
 
-IMPL constexpr auto c_str<T, A>::codec::encode_ptr(const char32_t in, T* out, int8_t size) noexcept -> void requires (!std::is_same_v<T, char>)
+IMPL constexpr auto c_str<T, A>::codec::encode_ptr(const char32_t in, T* out, int8_t size) noexcept -> void
 {
-	if constexpr (std::is_same_v<T, char32_t>)
+	if constexpr (std::is_same_v<T, char>)
 	{
 		out[0] = static_cast<T>(in);
 	}
-
 	if constexpr (std::is_same_v<T, char8_t>)
 	{
 		switch (size)
@@ -1883,7 +1925,6 @@ IMPL constexpr auto c_str<T, A>::codec::encode_ptr(const char32_t in, T* out, in
 			}
 		}
 	}
-
 	if constexpr (std::is_same_v<T, char16_t>)
 	{
 		switch (size)
@@ -1905,15 +1946,18 @@ IMPL constexpr auto c_str<T, A>::codec::encode_ptr(const char32_t in, T* out, in
 			}
 		}
 	}
+	if constexpr (std::is_same_v<T, char32_t>)
+	{
+		out[0] = static_cast<T>(in);
+	}
 }
 
-IMPL constexpr auto c_str<T, A>::codec::decode_ptr(const T* in, char32_t& out, int8_t size) noexcept -> void requires (!std::is_same_v<T, char>)
+IMPL constexpr auto c_str<T, A>::codec::decode_ptr(const T* in, char32_t& out, int8_t size) noexcept -> void
 {
-	if constexpr (std::is_same_v<T, char32_t>)
+	if constexpr (std::is_same_v<T, char>)
 	{
 		out = static_cast<char32_t>(in[0]);
 	}
-
 	if constexpr (std::is_same_v<T, char8_t>)
 	{
 		switch (size)
@@ -1956,7 +2000,6 @@ IMPL constexpr auto c_str<T, A>::codec::decode_ptr(const T* in, char32_t& out, i
 			}
 		}
 	}
-
 	if constexpr (std::is_same_v<T, char16_t>)
 	{
 		switch (size)
@@ -1978,6 +2021,10 @@ IMPL constexpr auto c_str<T, A>::codec::decode_ptr(const T* in, char32_t& out, i
 				break;
 			}
 		}
+	}
+	if constexpr (std::is_same_v<T, char32_t>)
+	{
+		out = static_cast<char32_t>(in[0]);
 	}
 }
 
@@ -2002,7 +2049,6 @@ IMPL constexpr auto c_str<T, A>::cursor::operator&() noexcept -> const T*
 
 IMPL constexpr auto c_str<T, A>::cursor::operator++(   ) noexcept -> cursor&
 {
-	// += is fine because (0 < rvalue)
 	this->ptr += codec::next(this->ptr);
 
 	return *this;
@@ -2019,7 +2065,6 @@ IMPL constexpr auto c_str<T, A>::cursor::operator++(int) noexcept -> cursor
 
 IMPL constexpr auto c_str<T, A>::cursor::operator--(   ) noexcept -> cursor&
 {
-	// += is fine because (rvalue < 0)
 	this->ptr += codec::back(this->ptr);
 
 	return *this;
@@ -2232,27 +2277,29 @@ typedef c_str<char32_t> utf32;
 
 #undef IMPL
 
-namespace fs
-{
-	namespace detail
-	{
-		enum encoding : uint8_t
-		{
-			UTF8_STD = (0 << 4) | 0,
-			UTF8_BOM = (1 << 4) | 3,
-			UTF16_BE = (2 << 4) | 2,
-			UTF16_LE = (3 << 4) | 2,
-			UTF32_BE = (4 << 4) | 4,
-			UTF32_LE = (5 << 4) | 4,
-		};
+#pragma region filesystem
 
-		auto byte_order_mask(std::istream& is) -> encoding
+template<class S> auto file_of(const S& path) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+{
+	enum format
+	{
+		UTF8_STD = (0 << 4) | 0,
+		UTF8_BOM = (1 << 4) | 3,
+		UTF16_BE = (2 << 4) | 2,
+		UTF16_LE = (3 << 4) | 2,
+		UTF32_BE = (4 << 4) | 4,
+		UTF32_LE = (5 << 4) | 4,
+	};
+
+	struct lambda
+	{
+		static auto byte_order_mask(std::ifstream& ifs) noexcept -> format
 		{
 			char buffer[4];
 
-			is.seekg(0, std::ios::beg);
-			is.read(&buffer[0], 4);
-			is.seekg(0, std::ios::beg);
+			ifs.seekg(0, std::ios::beg);
+			ifs.read(&buffer[0], 4);
+			ifs.seekg(0, std::ios::beg);
 
 			// 00 00 FE FF
 			if (buffer[0] == '\x00'
@@ -2291,38 +2338,278 @@ namespace fs
 
 			return UTF8_STD;
 		}
-	}
 
-	typedef std::variant<utf8, utf16, utf32> file;
+		// for utf-8
+		static auto write_as_native(std::ifstream& ifs, c_str<char8_t>& str) noexcept
+		{
+			typedef char8_t T; T buffer;
+
+			T* foo;
+			T* bar;
+
+			foo = bar = str.store.head();
+
+			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
+			{
+				if (buffer == '\r'
+				    &&
+				    ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T))
+				    &&
+				    buffer != '\n')
+				{
+					*(foo++) = '\n';
+				}
+				*(foo++) = buffer;
+			}
+			// fix invariant
+			str.written(foo - bar);
+		}
+
+		// for utf-16
+		static auto write_as_native(std::ifstream& ifs, c_str<char16_t>& str) noexcept
+		{
+			typedef char16_t T; T buffer;
+
+			T* foo;
+			T* bar;
+
+			foo = bar = str.store.head();
+
+			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
+			{
+				if (buffer == '\r'
+				    &&
+				    ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T))
+				    &&
+				    buffer != '\n')
+				{
+					*(foo++) = '\n';
+				}
+				*(foo++) = buffer;
+			}
+			// fix invariant
+			str.written(foo - bar);
+		}
+
+		// for utf-32
+		static auto write_as_native(std::ifstream& ifs, c_str<char32_t>& str) noexcept
+		{
+			typedef char32_t T; T buffer;
+
+			T* foo;
+			T* bar;
+
+			foo = bar = str.store.head();
+
+			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
+			{
+				if (buffer == '\r'
+				    &&
+				    ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T))
+				    &&
+				    buffer != '\n')
+				{
+					*(foo++) = '\n';
+				}
+				*(foo++) = buffer;
+			}
+			// fix invariant
+			str.written(foo - bar);
+		}
+
+		// for utf-8
+		static auto write_as_foreign(std::ifstream& ifs, c_str<char8_t>& str) noexcept
+		{
+			typedef char8_t T; T buffer;
+
+			T* foo;
+			T* bar;
+
+			foo = bar = str.store.head();
+
+			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
+			{
+				if ((buffer = std::byteswap(buffer)) == '\r'
+				    &&
+				    ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T))
+				    &&
+				    (buffer = std::byteswap(buffer)) != '\n')
+				{
+					*(foo++) = '\n';
+				}
+				*(foo++) = buffer;
+			}
+			// fix invariant
+			str.written(foo - bar);
+		}
+
+		// for utf-16
+		static auto write_as_foreign(std::ifstream& ifs, c_str<char16_t>& str) noexcept
+		{
+			typedef char16_t T; T buffer;
+
+			T* foo;
+			T* bar;
+
+			foo = bar = str.store.head();
+
+			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
+			{
+				if ((buffer = std::byteswap(buffer)) == '\r'
+				    &&
+				    ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T))
+				    &&
+				    (buffer = std::byteswap(buffer)) != '\n')
+				{
+					*(foo++) = '\n';
+				}
+				*(foo++) = buffer;
+			}
+		}
+
+		// for utf-32
+		static auto write_as_foreign(std::ifstream& ifs, c_str<char32_t>& str) noexcept
+		{
+			typedef char32_t T; T buffer;
+
+			T* foo;
+			T* bar;
+
+			foo = bar = str.store.head();
+
+			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
+			{
+				if ((buffer = std::byteswap(buffer)) == '\r'
+				    &&
+				    ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T))
+				    &&
+				    (buffer = std::byteswap(buffer)) != '\n')
+				{
+					*(foo++) = '\n';
+				}
+				*(foo++) = buffer;
+			}
+		}
+	};
 
 
-	template<class T, class A>
-	constexpr auto open(c_str<T, A>& path) noexcept -> std::optional<file>
+	if (std::ifstream ifs {path, std::ios::binary})
 	{
-		// TODO
-	}
+		const auto BOM {lambda::byte_order_mask(ifs)};
+		const auto off {BOM & 0xF /* bitwise hack */};
 
-	template<size_t N>
-	constexpr auto open(const char (&path)[N]) noexcept -> std::optional<file>
-	{
-		// TODO
-	}
+		size_t max;
 
-	template<size_t N>
-	constexpr auto open(const char8_t (&path)[N]) noexcept -> std::optional<file>
-	{
-		// TODO
-	}
+		// to the BOM
+		ifs.seekg(off, std::ios::beg); max = ifs.tellg() - static_cast<std::streamoff>(0x0);
+		// to the END
+		ifs.seekg(0x0, std::ios::end); max = ifs.tellg() - static_cast<std::streamoff>(max);
+		// to the BOM
+		ifs.seekg(off, std::ios::beg); // BOM offset calculation is done above, now rest...
 
-	template<size_t N>
-	constexpr auto open(const char16_t (&path)[N]) noexcept -> std::optional<file>
-	{
-		// TODO
-	}
+		#define IS_BIG          \
+		(                       \
+		    std::endian::native \
+		             !=         \
+		    std::endian::little \
+		)                       \
 
-	template<size_t N>
-	constexpr auto open(const char32_t (&path)[N]) noexcept -> std::optional<file>
-	{
-		// TODO
+		switch (BOM)
+		{
+			case UTF8_STD:
+			{
+				c_str<char8_t> str;
+
+				str.capacity((max / sizeof(char8_t)) + 1);
+
+				if constexpr (!IS_BIG) lambda::write_as_native(ifs, str);
+				                  else lambda::write_as_native(ifs, str);
+
+				return str;
+			}
+			case UTF8_BOM:
+			{
+				c_str<char8_t> str;
+
+				str.capacity((max / sizeof(char8_t)) + 1);
+
+				if constexpr (IS_BIG) lambda::write_as_native(ifs, str);
+				                 else lambda::write_as_native(ifs, str);
+
+				return str;
+			}
+			case UTF16_LE:
+			{
+				c_str<char16_t> str;
+
+				str.capacity((max / sizeof(char16_t)) + 1);
+
+				if constexpr (!IS_BIG) lambda::write_as_native(ifs, str);
+				                  else lambda::write_as_foreign(ifs, str);
+
+				return str;
+			}
+			case UTF16_BE:
+			{
+				c_str<char16_t> str;
+
+				str.capacity((max / sizeof(char16_t)) + 1);
+
+				if constexpr (IS_BIG) lambda::write_as_native(ifs, str);
+				                 else lambda::write_as_foreign(ifs, str);
+
+				return str;
+			}
+			case UTF32_LE:
+			{
+				c_str<char32_t> str;
+
+				str.capacity((max / sizeof(char32_t)) + 1);
+
+				if constexpr (!IS_BIG) lambda::write_as_native(ifs, str);
+				                  else lambda::write_as_foreign(ifs, str);
+
+				return str;
+			}
+			case UTF32_BE:
+			{
+				c_str<char32_t> str;
+
+				str.capacity((max / sizeof(char32_t)) + 1);
+
+				if constexpr (IS_BIG) lambda::write_as_native(ifs, str);
+				                 else lambda::write_as_foreign(ifs, str);
+
+				return str;
+			}
+		}
+		#undef IS_BIG
 	}
+	return std::nullopt;
 }
+
+// returns the content of a file. if BOM is N/A, it falls back to utf-8 encoding.
+template<size_t N> auto file_of(const char (&in)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+{
+	return file_of(c_str {in});
+}
+
+// returns the content of a file. if BOM is N/A, it falls back to utf-8 encoding.
+template<size_t N> auto file_of(const char8_t (&in)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+{
+	return file_of(utf8 {in});
+}
+
+// returns the content of a file. if BOM is N/A, it falls back to utf-8 encoding.
+template<size_t N> auto file_of(const char16_t (&in)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+{
+	return file_of(utf16 {in});
+}
+
+// returns the content of a file. if BOM is N/A, it falls back to utf-8 encoding.
+template<size_t N> auto file_of(const char32_t (&in)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+{
+	return file_of(utf32 {in});
+}
+
+#pragma endregion filesystem
