@@ -410,39 +410,38 @@ public:
 	}
 
 	template<size_t N>
-	requires (N <= MAX)
 	constexpr c_str(const T (&other)[N]) noexcept
 	{
-		this->capacity(N);
+		if constexpr (N <= MAX)
+		{
+			this->capacity(N);
 
-		std::ranges::copy
-		(
-			&other[0], // now we can safely
-			&other[N], // access &.small[0]
-			&this->store.__union__.small[0]
-		);
-		// fix invariant
-		this->written(N);
+			std::ranges::copy
+			(
+				&other[0], // now we can safely
+				&other[N], // access &.small[0]
+				&this->store.__union__.small[0]
+			);
+			// fix invariant
+			this->written(N);
 
-		assert(this->store.tag() == SMALL);
-	}
+			assert(this->store.tag() == SMALL);
+		}
+		if constexpr (MAX < N)
+		{
+			this->capacity(N);
 
-	template<size_t N>
-	requires (MAX < N)
-	constexpr c_str(const T (&other)[N]) noexcept
-	{
-		this->capacity(N);
+			std::ranges::copy
+			(
+				&other[0], // now we can safely
+				&other[N], // access .large.head
+				this->store.__union__.large.head
+			);
+			// fix invariant
+			this->written(N);
 
-		std::ranges::copy
-		(
-			&other[0], // now we can safely
-			&other[N], // access .large.head
-			this->store.__union__.large.head
-		);
-		// fix invariant
-		this->written(N);
-
-		assert(this->store.tag() == LARGE);
+			assert(this->store.tag() == LARGE);
+		}
 	}
 
 	// rule of 5
@@ -777,20 +776,20 @@ public:
 
 	friend constexpr auto operator==(const c_str& lhs, const c_str& rhs) noexcept -> bool
 	{
-		return &lhs == &rhs || lhs.size() == rhs.size() && std::ranges::equal
+		return &lhs == &rhs || (lhs.size() == rhs.size() && std::ranges::equal
 		(
 			lhs.store.head(), lhs.store.tail(),
 			rhs.store.head(), rhs.store.tail()
-		);
+		));
 	}
 
 	friend constexpr auto operator==(const slice& lhs, const slice& rhs) noexcept -> bool
 	{
-		return &lhs == &rhs || lhs.size() == rhs.size() && std::ranges::equal
+		return &lhs == &rhs || (lhs.size() == rhs.size() && std::ranges::equal
 		(
 			lhs.head, lhs.tail,
 			rhs.head, rhs.tail
-		);
+		));
 	}
 	
 	friend constexpr auto operator==(const c_str& lhs, const slice& rhs) noexcept -> bool
@@ -1134,8 +1133,6 @@ IMPL constexpr auto c_str<T, A>::capacity(size_t value)       noexcept -> void
 	// ??? -> large
 	else if (this->capacity() < value)
 	{
-		__MALLOC__:
-
 		auto* head {std::allocator_traits<A>::allocate(this->store, value)};
 
 		// data migration

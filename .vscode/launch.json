@@ -2,18 +2,29 @@
 	"configurations":
 	[
 		{
-			"name": "UCRT",
+			"name": "cppvsdbg",
 			// c++
-			"type": "cppdbg",
+			"type": "cppvsdbg",
 			"request": "launch",
 			// cmake
 			"cwd": "${workspaceFolder}",
 			"program": "${command:cmake.launchTargetPath}",
 		},
 		{
-			"name": "MSVC",
+			"name": "(gdb) cppdbg",
 			// c++
-			"type": "cppvsdbg",
+			"type": "cppdbg",
+			"MIMode": "gdb",
+			"request": "launch",
+			// cmake
+			"cwd": "${workspaceFolder}",
+			"program": "${command:cmake.launchTargetPath}",
+		},
+		{
+			"name": "(lldb) cppdbg",
+			// c++
+			"type": "cppdbg",
+			"MIMode": "lldb",
 			"request": "launch",
 			// cmake
 			"cwd": "${workspaceFolder}",
