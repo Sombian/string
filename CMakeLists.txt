@@ -10,12 +10,19 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_link_options("-fuse-ld=lld")
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	add_link_options("-fuse-ld=bfd")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+	add_link_options("-fuse-ld=lld")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+	add_link_options("-fuse-ld=link")
+endif()
+
+# main entry point...
 add_executable(main src/main.cpp)
 
 # scan pkg/<module>/<header>
