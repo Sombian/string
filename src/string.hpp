@@ -71,6 +71,12 @@ inline auto operator<<(std::ostream& os, char32_t code) -> std::ostream&
 	return os.write(out, unit);
 }
 
+// carries special meaning
+enum class syntax : uint8_t
+{
+	N // the last code point
+};
+
 template
 <
 	class T = char /* legacy */,
@@ -131,9 +137,10 @@ class c_str
 		const T* head;
 		const T* tail;
 
-		// for slice
 		class reader
 		{
+		protected:
+
 			slice* src;
 			size_t nth;
 
@@ -146,19 +153,28 @@ class c_str
 			)
 			: src(src), nth(nth) {}
 
-			[[nodiscard]] constexpr operator char32_t() const&& noexcept;
+			[[nodiscard]] constexpr operator char32_t() const noexcept;
+
+			auto constexpr operator==(char32_t code) const noexcept -> bool;
+			auto constexpr operator!=(char32_t code) const noexcept -> bool;
 		};
 
-		// for slice
 		class writer
 		      :
 		      reader
 		{
-			friend reader;
+			// nothing to do...
 
 		public:
 
-			// constexpr auto operator=(char32_t code)&& noexcept -> writer&;
+			using reader::operator char32_t;
+			
+			using reader::operator==;
+			using reader::operator!=;
+
+			using reader::reader;
+
+			// constexpr auto operator=(char32_t code) noexcept -> writer&;
 		};
 
 	public:
@@ -183,11 +199,11 @@ class c_str
 		template<size_t N>
 		constexpr auto split(const T (&value)[N]) const noexcept -> std::vector<slice>;
 
-		// returns a list of string slice, of which are indentical to the given parameter.
+		// returns a list of string slice, of which are product of search occurrence.
 		constexpr auto match(const c_str& value) const noexcept -> std::vector<slice>;
-		// returns a list of string slice, of which are indentical to the given parameter.
+		// returns a list of string slice, of which are product of search occurrence.
 		constexpr auto match(const slice& value) const noexcept -> std::vector<slice>;
-		// returns a list of string slice, of which are indentical to the given parameter.
+		// returns a list of string slice, of which are product of search occurrence.
 		template<size_t N>
 		constexpr auto match(const T (&value)[N]) const noexcept -> std::vector<slice>;
 
@@ -203,11 +219,11 @@ class c_str
 
 		// subscript
 
-		constexpr auto operator[](size_t value) const noexcept -> const T& requires (std::is_same_v<T, char>);
-		constexpr auto operator[](size_t value)       noexcept -> const T& requires (std::is_same_v<T, char>);
+		constexpr auto operator[](size_t value) const noexcept -> reader;
+		constexpr auto operator[](size_t value)       noexcept -> writer;
 
-		constexpr auto operator[](size_t value) const noexcept -> reader requires (!std::is_same_v<T, char>);
-		constexpr auto operator[](size_t value)       noexcept -> writer requires (!std::is_same_v<T, char>);
+		// constexpr auto operator[](size_t from, syntax until) const noexcept -> slice;
+		// constexpr auto operator[](size_t from, size_t until) const noexcept -> slice;
 	};
 
 	static constexpr auto __split__(const T* head, const T* tail, const T* str_0, const T* str_N) noexcept -> std::vector<slice>;
@@ -216,9 +232,10 @@ class c_str
 	static constexpr auto __fsubstr__(const T* head, const T* tail, size_t start, size_t until) noexcept -> slice;
 	static constexpr auto __rsubstr__(const T* head, const T* tail, size_t start, size_t until) noexcept -> slice;
 
-	// for c_str
 	class reader
 	{
+	protected:
+
 		c_str* src;
 		size_t nth;
 
@@ -231,19 +248,28 @@ class c_str
 		)
 		: src(src), nth(nth) {}
 
-		[[nodiscard]] constexpr operator char32_t() const&& noexcept;
+		[[nodiscard]] constexpr operator char32_t() const noexcept;
+
+		auto constexpr operator==(char32_t code) const noexcept -> bool;
+		auto constexpr operator!=(char32_t code) const noexcept -> bool;
 	};
 
-	// for c_str
 	class writer
 	      :
 	      reader
 	{
-		friend reader;
+		// nothing to do...
 
 	public:
 
-		constexpr auto operator=(char32_t code)&& noexcept -> writer&;
+		using reader::operator char32_t;
+		
+		using reader::operator==;
+		using reader::operator!=;
+
+		using reader::reader;
+
+		constexpr auto operator=(char32_t code) noexcept -> writer&;
 	};
 
 	struct buffer
@@ -307,8 +333,10 @@ class c_str
 		//| 1 bit | 1 bit | 1 bit | 1 bit | 1 bit | 1 bit | 1 bit | 1 bit |
 		//|-------|-------|-------|-------|-------|-------|-------|-------|
 
-		constexpr auto tag() const noexcept -> mode_t;
-		constexpr auto tag()       noexcept -> mode_t;
+		// single source of truth; category.
+		constexpr auto mode() const noexcept -> mode_t;
+		// single source of truth; category.
+		constexpr auto mode()       noexcept -> mode_t;
 
 		//|-------------------------------------------------------|-------|
 		//|   ↓       ↓       ↓       ↓       ↓       ↓       ↓   |       |
@@ -459,7 +487,7 @@ public:
 
 	SWAP_PTR_LOGIC(c_str)
 	{
-		if (dest.store.tag() == LARGE)
+		if (dest.store.mode() == LARGE)
 		{
 			// ...release heap allocated memory
 			std::allocator_traits<A>::deallocate
@@ -498,11 +526,11 @@ public:
 	template<size_t N>
 	constexpr auto split(const T (&value)[N]) const noexcept -> std::vector<slice>;
 
-	// returns a list of string slice, of which are indentical to the given parameter.
+	// returns a list of string slice, of which are product of search occurrence.
 	constexpr auto match(const c_str& value) const noexcept -> std::vector<slice>;
-	// returns a list of string slice, of which are indentical to the given parameter.
+	// returns a list of string slice, of which are product of search occurrence.
 	constexpr auto match(const slice& value) const noexcept -> std::vector<slice>;
-	// returns a list of string slice, of which are indentical to the given parameter.
+	// returns a list of string slice, of which are product of search occurrence.
 	template<size_t N>
 	constexpr auto match(const T (&value)[N]) const noexcept -> std::vector<slice>;
 
@@ -518,11 +546,11 @@ public:
 
 	// subscript
 
-	constexpr auto operator[](size_t value) const noexcept -> const T& requires (std::is_same_v<T, char>);
-	constexpr auto operator[](size_t value)       noexcept ->       T& requires (std::is_same_v<T, char>);
+	constexpr auto operator[](size_t value) const noexcept -> reader;
+	constexpr auto operator[](size_t value)       noexcept -> writer;
 
-	constexpr auto operator[](size_t value) const noexcept -> reader requires (!std::is_same_v<T, char>);
-	constexpr auto operator[](size_t value)       noexcept -> writer requires (!std::is_same_v<T, char>);
+	// constexpr auto operator[](size_t from, syntax until) const noexcept -> slice;
+	// constexpr auto operator[](size_t from, size_t until) const noexcept -> slice;
 
 	// iostream
 	
@@ -788,8 +816,6 @@ public:
 
 	friend constexpr auto operator!=(const slice& lhs, const slice& rhs) noexcept -> bool
 	{
-		if (&lhs != &rhs) { return true; }
-
 		const auto* lhs_0 {lhs.head}; const auto* rhs_0 {rhs.head};
 		const auto* lhs_N {lhs.tail}; const auto* rhs_N {rhs.tail};
 
@@ -992,8 +1018,9 @@ IMPL constexpr auto c_str<T, A>::__match__(const T* head, const T* tail, const T
 
 IMPL constexpr auto c_str<T, A>::__fsubstr__(const T* head, const T* tail, size_t start, size_t until) noexcept -> slice
 {
-	// O(1) accessing: utf-32 specific trick
-	if constexpr (std::is_same_v<T, char32_t>)
+	if constexpr (std::is_same_v<T, char32_t>
+	             ||
+	             std::is_same_v<T, char>)
 	{
 		assert(&head[start] < tail);
 		assert(&head[until] < tail);
@@ -1023,8 +1050,9 @@ IMPL constexpr auto c_str<T, A>::__fsubstr__(const T* head, const T* tail, size_
 
 IMPL constexpr auto c_str<T, A>::__rsubstr__(const T* head, const T* tail, size_t start, size_t until) noexcept -> slice
 {
-	// O(1) accessing: utf-32 specific trick
-	if constexpr (std::is_same_v<T, char32_t>)
+	if constexpr (std::is_same_v<T, char32_t>
+	             ||
+	             std::is_same_v<T, char>)
 	{
 		assert(head < &tail[start]);
 		assert(head < &tail[until]);
@@ -1071,7 +1099,7 @@ IMPL constexpr c_str<T, A>::storage::storage() noexcept
 
 IMPL constexpr c_str<T, A>::storage::~storage() noexcept
 {
-	if (this->tag() == LARGE)
+	if (this->mode() == LARGE)
 	{
 		// ...release heap allocated memory
 		std::allocator_traits<A>::deallocate
@@ -1085,13 +1113,13 @@ IMPL constexpr c_str<T, A>::storage::~storage() noexcept
 	}
 }
 
-IMPL constexpr auto c_str<T, A>::storage::tag() const noexcept -> mode_t
+IMPL constexpr auto c_str<T, A>::storage::mode() const noexcept -> mode_t
 {
 	// or static_cast<mode_t>(this->__union__.large.meta & MSK);
 	return static_cast<mode_t>(this->__union__.bytes[RMB] & MSK);
 }
 
-IMPL constexpr auto c_str<T, A>::storage::tag()       noexcept -> mode_t
+IMPL constexpr auto c_str<T, A>::storage::mode()       noexcept -> mode_t
 {
 	// or static_cast<mode_t>(this->__union__.large.meta & MSK);
 	return static_cast<mode_t>(this->__union__.bytes[RMB] & MSK);
@@ -1099,7 +1127,7 @@ IMPL constexpr auto c_str<T, A>::storage::tag()       noexcept -> mode_t
 
 IMPL constexpr auto c_str<T, A>::storage::head() const noexcept -> const T*
 {
-	return this->tag() == SMALL
+	return this->mode() == SMALL
 	       ?
 	       this->__union__.small
 	       :
@@ -1108,7 +1136,7 @@ IMPL constexpr auto c_str<T, A>::storage::head() const noexcept -> const T*
 
 IMPL constexpr auto c_str<T, A>::storage::head()       noexcept ->       T*
 {
-	return this->tag() == SMALL
+	return this->mode() == SMALL
 	       ?
 	       this->__union__.small
 	       :
@@ -1117,7 +1145,7 @@ IMPL constexpr auto c_str<T, A>::storage::head()       noexcept ->       T*
 
 IMPL constexpr auto c_str<T, A>::storage::tail() const noexcept -> const T*
 {
-	return this->tag() == SMALL
+	return this->mode() == SMALL
 	       ?
 	       &this->__union__.small[MAX - (this->__union__.bytes[RMB] >> SFT)]
 	       :
@@ -1126,7 +1154,7 @@ IMPL constexpr auto c_str<T, A>::storage::tail() const noexcept -> const T*
 
 IMPL constexpr auto c_str<T, A>::storage::tail()       noexcept ->       T*
 {
-	return this->tag() == SMALL
+	return this->mode() == SMALL
 	       ?
 	       &this->__union__.small[MAX - (this->__union__.bytes[RMB] >> SFT)]
 	       :
@@ -1429,7 +1457,7 @@ IMPL constexpr auto c_str<T, A>::cursor::operator!=(const cursor& rhs) noexcept 
 
 IMPL constexpr auto c_str<T, A>::size() const noexcept -> size_t
 {
-	return this->store.tag() == SMALL
+	return this->store.mode() == SMALL
 	       ?
 	       MAX - (this->store.__union__.bytes[RMB] >> SFT)
 	       :
@@ -1438,7 +1466,9 @@ IMPL constexpr auto c_str<T, A>::size() const noexcept -> size_t
 
 IMPL constexpr auto c_str<T, A>::length() const noexcept -> size_t
 {
-	if constexpr (std::is_same_v<T, char32_t>)
+	if constexpr (std::is_same_v<T, char32_t>
+	             ||
+	             std::is_same_v<T, char>)
 	{
 		return this->size();
 	}
@@ -1456,7 +1486,7 @@ IMPL constexpr auto c_str<T, A>::length() const noexcept -> size_t
 
 IMPL constexpr auto c_str<T, A>::__size__(size_t value)        noexcept -> void
 {
-	switch (this->store.tag())
+	switch (this->store.mode())
 	{
 		case SMALL:
 		{
@@ -1487,7 +1517,7 @@ IMPL constexpr auto c_str<T, A>::__size__(size_t value)        noexcept -> void
 
 IMPL constexpr auto c_str<T, A>::capacity(/* getter */) const noexcept -> size_t
 {
-	return this->store.tag() == SMALL
+	return this->store.mode() == SMALL
 	       ?
 	       MAX // or calculate the std::ptrdiff_t just as large mode as shown below
 		   :
@@ -1508,7 +1538,7 @@ IMPL constexpr auto c_str<T, A>::capacity(size_t value)       noexcept -> void
 			head // new T[value]
 		);
 
-		if (this->store.tag() == LARGE)
+		if (this->store.mode() == LARGE)
 		{
 			// ...release heap allocated memory
 			std::allocator_traits<A>::deallocate
@@ -1554,12 +1584,12 @@ IMPL /* ver. T=c_str */ constexpr auto c_str<T, A>::match(const c_str& value) co
 
 IMPL /* ver. T=slice */ constexpr auto c_str<T, A>::match(const slice& value) const noexcept -> std::vector<slice>
 {
-	return __split__(this->store.head(), this->store.tail(), value.head, value.tail);
+	return __match__(this->store.head(), this->store.tail(), value.head, value.tail);
 }
 
 IMPL template<size_t N> constexpr auto c_str<T, A>::match(const T (&value)[N]) const noexcept -> std::vector<slice>
 {
-	return __split__(this->store.head(), this->store.tail(), &value[0], &value[N - 1]);
+	return __match__(this->store.head(), this->store.tail(), &value[0], &value[N - 1]);
 }
 
 IMPL constexpr auto c_str<T, A>::fsubstr(size_t start, size_t until) const noexcept -> slice
@@ -1582,24 +1612,14 @@ IMPL constexpr auto c_str<T, A>::end() const noexcept -> cursor
 	return {this->store.tail()};
 }
 
-IMPL constexpr auto c_str<T, A>::operator[](size_t value) const noexcept -> const T& requires (std::is_same_v<T, char>)
+IMPL constexpr auto c_str<T, A>::operator[](size_t value) const noexcept -> reader
 {
-	return this->store.head()[value];
+	return {this, value};
 }
 
-IMPL constexpr auto c_str<T, A>::operator[](size_t value)       noexcept ->       T& requires (std::is_same_v<T, char>)
+IMPL constexpr auto c_str<T, A>::operator[](size_t value)       noexcept -> writer
 {
-	return this->store.head()[value];
-}
-
-IMPL constexpr auto c_str<T, A>::operator[](size_t value) const noexcept -> reader requires (!std::is_same_v<T, char>)
-{
-	return {*this, value};
-}
-
-IMPL constexpr auto c_str<T, A>::operator[](size_t value)       noexcept -> writer requires (!std::is_same_v<T, char>)
-{
-	return {*this, value};
+	return {this, value};
 }
 
 #pragma endregion c_str
@@ -1615,7 +1635,9 @@ IMPL constexpr auto c_str<T, A>::slice::size() const noexcept -> size_t
 
 IMPL constexpr auto c_str<T, A>::slice::length() const noexcept -> size_t
 {
-	if constexpr (std::is_same_v<T, char32_t>)
+	if constexpr (std::is_same_v<T, char32_t>
+	             ||
+	             std::is_same_v<T, char>)
 	{
 		return this->size();
 	}
@@ -1681,39 +1703,30 @@ IMPL constexpr auto c_str<T, A>::slice::end() const noexcept -> cursor
 	return {this->tail};
 }
 
-IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value) const noexcept -> const T& requires (std::is_same_v<T, char>)
+IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value) const noexcept -> reader
 {
-	return this->head[value];
+	return {this, value};
 }
 
-IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value)       noexcept -> const T& requires (std::is_same_v<T, char>)
+IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value)       noexcept -> writer
 {
-	return this->head[value];
-}
-
-IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value) const noexcept -> reader requires (!std::is_same_v<T, char>)
-{
-	return {*this, value};
-}
-
-IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value)       noexcept -> writer requires (!std::is_same_v<T, char>)
-{
-	return {*this, value};
+	return {this, value};
 }
 
 #pragma endregion slice
 
 #pragma region c_str::reader
 
-IMPL [[nodiscard]] constexpr c_str<T, A>::reader::operator char32_t() const&& noexcept
+IMPL [[nodiscard]] constexpr c_str<T, A>::reader::operator char32_t() const noexcept
 {
 	auto* head {this->src->store.head()};
 	auto* tail {this->src->store.tail()};
 
 	size_t i {0};
 
-	// O(1) accessing: utf-32 specific trick
-	if constexpr (std::is_same_v<T, char32_t>)
+	if constexpr (std::is_same_v<T, char32_t>
+	             ||
+	             std::is_same_v<T, char>)
 	{
 		if (this->nth < this->src->size())
 		{
@@ -1740,19 +1753,30 @@ IMPL [[nodiscard]] constexpr c_str<T, A>::reader::operator char32_t() const&& no
 	return U'\uFFFD';
 }
 
+IMPL auto constexpr c_str<T, A>::reader::operator==(char32_t code) const noexcept -> bool
+{
+	return operator char32_t() == code;
+}
+
+IMPL auto constexpr c_str<T, A>::reader::operator!=(char32_t code) const noexcept -> bool
+{
+	return operator char32_t() != code;
+}
+
 #pragma endregion c_str::reader
 
 #pragma region c_str::writer
 
-IMPL constexpr auto c_str<T, A>::writer::operator=(char32_t code)&& noexcept -> writer&
+IMPL constexpr auto c_str<T, A>::writer::operator=(char32_t code) noexcept -> writer&
 {
 	auto* head {this->src->store.head()};
 	auto* tail {this->src->store.tail()};
 
 	size_t i {0};
 
-	// O(1) accessing: utf-32 specific trick
-	if constexpr (std::is_same_v<T, char32_t>)
+	if constexpr (std::is_same_v<T, char32_t>
+	             ||
+	             std::is_same_v<T, char>)
 	{
 		if (this->nth < this->src->size())
 		{
@@ -1786,9 +1810,9 @@ IMPL constexpr auto c_str<T, A>::writer::operator=(char32_t code)&& noexcept -> 
 				const auto old_l {this->src->size()};
 				const auto new_l {old_l + (b - a)};
 
-				if (this->src.capacity() <= new_l)
+				if (this->src->capacity() <= new_l)
 				{
-					this->src.capacity(new_l * 2);
+					this->src->capacity(new_l * 2);
 				}
 
 				std::ranges::copy_backward
@@ -1832,15 +1856,16 @@ IMPL constexpr auto c_str<T, A>::writer::operator=(char32_t code)&& noexcept -> 
 
 #pragma region slice::reader
 
-IMPL [[nodiscard]] constexpr c_str<T, A>::slice::reader::operator char32_t() const&& noexcept
+IMPL [[nodiscard]] constexpr c_str<T, A>::slice::reader::operator char32_t() const noexcept
 {
 	auto* head {this->src->head};
 	auto* tail {this->src->tail};
 
 	size_t i {0};
 
-	// O(1) accessing: utf-32 specific trick
-	if constexpr (std::is_same_v<T, char32_t>)
+	if constexpr (std::is_same_v<T, char32_t>
+	             ||
+	             std::is_same_v<T, char>)
 	{
 		if (this->nth < this->src->size())
 		{
@@ -1865,6 +1890,16 @@ IMPL [[nodiscard]] constexpr c_str<T, A>::slice::reader::operator char32_t() con
 		}
 	}
 	return U'\uFFFD';
+}
+
+IMPL auto constexpr c_str<T, A>::slice::reader::operator==(char32_t code) const noexcept -> bool
+{
+	return operator char32_t() == code;
+}
+
+IMPL auto constexpr c_str<T, A>::slice::reader::operator!=(char32_t code) const noexcept -> bool
+{
+	return operator char32_t() != code;
 }
 
 #pragma endregion slice::reader
