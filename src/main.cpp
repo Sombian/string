@@ -24,7 +24,7 @@ TEST_CASE("invariant")
 	}
 }
 
-TEST_CASE("equaility")
+TEST_CASE("equality")
 {
 	c_str foo {"foo"};
 	c_str bar {"bar"};
@@ -46,15 +46,28 @@ TEST_CASE("equaility")
 		CHECK(foo + bar == "foobar");
 		CHECK("foobar" == foo + bar);
 	}
+
+	SUBCASE("slice")
+	{
+		utf8 str {u8"티라미수☆치즈케잌"};
+
+		auto parts {str.split(u8"☆")};
+
+		CHECK(parts[0] == u8"티라미수");
+		CHECK(parts[0].length() == 4);
+
+		CHECK(parts[1] == u8"치즈케잌");
+		CHECK(parts[1].length() == 4);
+	}
 }
 
-TEST_CASE("file_of")
+TEST_CASE("fileof")
 {
 	SUBCASE("UTF-8")
 	{
 		c_str path {"sample/utf8.txt"};
 
-		if (auto file {file_of(path)})
+		if (auto file {fileof(path)})
 		{
 			std::visit([&](auto&& _)
 			{
@@ -63,11 +76,12 @@ TEST_CASE("file_of")
 			std::move(file.value()));
 		}
 	}
+
 	SUBCASE("UTF-16-LE")
 	{
 		c_str path {"sample/utf16le.txt"};
 
-		if (auto file {file_of(path)})
+		if (auto file {fileof(path)})
 		{
 			std::visit([&](auto&& _)
 			{
@@ -76,11 +90,12 @@ TEST_CASE("file_of")
 			std::move(file.value()));
 		}
 	}
+
 	SUBCASE("UTF-16-BE")
 	{
 		c_str path {"test/utf16be.txt"};
 
-		if (auto file {file_of(path)})
+		if (auto file {fileof(path)})
 		{
 			std::visit([&](auto&& _)
 			{

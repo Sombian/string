@@ -380,15 +380,15 @@ public:
 	};
 
 	// returns the content of a file with CR or CRLF to LF normalization.
-	template<class S> friend auto file_of(const S& path) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
+	template<class S> friend auto fileof(const S& path) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
 	// returns the content of a file with CR or CRLF to LF normalization.
-	template<size_t N> friend auto file_of(const char (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
+	template<size_t N> friend auto fileof(const char (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
 	// returns the content of a file with CR or CRLF to LF normalization.
-	template<size_t N> friend auto file_of(const char8_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
+	template<size_t N> friend auto fileof(const char8_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
 	// returns the content of a file with CR or CRLF to LF normalization.
-	template<size_t N> friend auto file_of(const char16_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
+	template<size_t N> friend auto fileof(const char16_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
 	// returns the content of a file with CR or CRLF to LF normalization.
-	template<size_t N> friend auto file_of(const char32_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
+	template<size_t N> friend auto fileof(const char32_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
 
 	// convertion
 
@@ -2271,7 +2271,7 @@ typedef c_str<char16_t> utf16;
 // https://en.wikipedia.org/wiki/UTF-32
 typedef c_str<char32_t> utf32;
 
-template<class S> auto file_of(const S& path) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+template<class S> auto fileof(const S& path) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
 {
 	enum format : uint8_t
 	{
@@ -2580,24 +2580,24 @@ template<class S> auto file_of(const S& path) noexcept -> std::optional<std::var
 	return std::nullopt;
 }
 
-template<size_t N> auto file_of(const char (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+template<size_t N> auto fileof(const char (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
 {
-	return file_of(c_str {path});
+	return fileof(c_str {path});
 }
 
-template<size_t N> auto file_of(const char8_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+template<size_t N> auto fileof(const char8_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
 {
-	return file_of(utf8 {path});
+	return fileof(utf8 {path});
 }
 
-template<size_t N> auto file_of(const char16_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+template<size_t N> auto fileof(const char16_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
 {
-	return file_of(utf16 {path});
+	return fileof(utf16 {path});
 }
 
-template<size_t N> auto file_of(const char32_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+template<size_t N> auto fileof(const char32_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
 {
-	return file_of(utf32 {path});
+	return fileof(utf32 {path});
 }
 
 // NOLINTEND(*-magic-numbers, *-union-access, *-signed-bitwise, *-avoid-c-arrays, *-pointer-arithmetic, *-constant-array-index, *-explicit-conversions)
