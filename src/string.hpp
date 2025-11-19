@@ -1135,6 +1135,296 @@ IMPL constexpr auto c_str<T, A>::storage::tail()       noexcept ->       T*
 
 #pragma endregion SSO
 
+#pragma region codec
+
+IMPL constexpr auto c_str<T, A>::codec::size(char32_t code) noexcept -> int8_t
+{
+	if constexpr (std::is_same_v<T, char>)
+	{
+		return 1;
+	}
+	if constexpr (std::is_same_v<T, char8_t>)
+	{
+		const auto N {std::bit_width
+		(static_cast<uint32_t>(code))};
+
+		//|-----------------------|
+		//| U+000000 ... U+00007F | -> 1 code unit
+		//| U+000080 ... U+0007FF | -> 2 code unit
+		//| U+000800 ... U+00FFFF | -> 3 code unit
+		//| U+010000 ... U+10FFFF | -> 4 code unit
+		//|-----------------------|
+
+		return 1 + (8 <= N) + (12 <= N) + (17 <= N);
+	}
+	if constexpr (std::is_same_v<T, char16_t>)
+	{
+		//|-----------------------|
+		//| U+000000 ... U+00D7FF | -> 1 code unit
+		//| U+00E000 ... U+00FFFF | -> 1 code unit
+		//| U+000000 ... U+10FFFF | -> 2 code unit
+		//|-----------------------|
+
+		return 1 + (0xFFFF /* surrogate */ < code);
+	}
+	if constexpr (std::is_same_v<T, char32_t>)
+	{
+		return 1;
+	}
+}
+
+IMPL constexpr auto c_str<T, A>::codec::next(const T* ptr) noexcept -> int8_t
+{
+	constexpr static const int8_t TABLE[]
+	{
+		/*| 0x0 |*/ 1, /*| 0x1 |*/ 1,
+		/*| 0x2 |*/ 1, /*| 0x3 |*/ 1,
+		/*| 0x4 |*/ 1, /*| 0x5 |*/ 1,
+		/*| 0x6 |*/ 1, /*| 0x7 |*/ 1,
+		/*| 0x8 |*/ 1, /*| 0x9 |*/ 1,
+		/*| 0xA |*/ 1, /*| 0xB |*/ 1,
+		/*| 0xC |*/ 2, /*| 0xD |*/ 2,
+		/*| 0xE |*/ 3, /*| 0xF |*/ 4,
+	};
+
+	if constexpr (std::is_same_v<T, char>)
+	{
+		return 1;
+	}
+	if constexpr (std::is_same_v<T, char8_t>)
+	{
+		// branchless programming for utf-8
+		return TABLE[(ptr[0] >> 0x4) & 0x0F];
+	}
+	if constexpr (std::is_same_v<T, char16_t>)
+	{
+		// branchless programming for utf-16
+		return 1 + ((ptr[0] >> 0xA) == 0x36);
+	}
+	if constexpr (std::is_same_v<T, char32_t>)
+	{
+		return 1;
+	}
+}
+
+IMPL constexpr auto c_str<T, A>::codec::back(const T* ptr) noexcept -> int8_t
+{
+	if constexpr (std::is_same_v<T, char>)
+	{
+		return -1;
+	}
+	if constexpr (std::is_same_v<T, char8_t>)
+	{
+		// walk backward until non-continuation code unit is found
+		int8_t i {-1}; for (; (ptr[i] & 0xC0) == 0x80; --i) {} return i;
+	}
+	if constexpr (std::is_same_v<T, char16_t>)
+	{
+		// walk backward until encountering leading surrogate is found
+		int8_t i {-1}; for (; (ptr[i] >> 0xA) == 0x37; --i) {} return i;
+	}
+	if constexpr (std::is_same_v<T, char32_t>)
+	{
+		return -1;
+	}
+}
+
+IMPL constexpr auto c_str<T, A>::codec::encode_ptr(const char32_t in, T* out, int8_t size) noexcept -> void
+{
+	if constexpr (std::is_same_v<T, char>)
+	{
+		out[0] = static_cast<T>(in);
+	}
+	if constexpr (std::is_same_v<T, char8_t>)
+	{
+		switch (size)
+		{
+			case 1:
+			{
+				out[0] = static_cast<T>(in);
+
+				break;
+			}
+			case 2:
+			{
+				out[0] = 0xC0 | ((in >> 06) & 0x1F);
+				out[1] = 0x80 | ((in >> 00) & 0x3F);
+
+				break;
+			}
+			case 3:
+			{
+				out[0] = 0xE0 | ((in >> 12) & 0x0F);
+				out[1] = 0x80 | ((in >> 06) & 0x3F);
+				out[2] = 0x80 | ((in >> 00) & 0x3F);
+
+				break;
+			}
+			case 4:
+			{
+				out[0] = 0xF0 | ((in >> 18) & 0x07);
+				out[1] = 0x80 | ((in >> 12) & 0x3F);
+				out[2] = 0x80 | ((in >> 06) & 0x3F);
+				out[3] = 0x80 | ((in >> 00) & 0x3F);
+
+				break;
+			}
+		}
+	}
+	if constexpr (std::is_same_v<T, char16_t>)
+	{
+		switch (size)
+		{
+			case 1:
+			{
+				out[0] = static_cast<T>(in);
+
+				break;
+			}
+			case 2:
+			{
+				const auto code {in - 0x10000};
+
+				out[0] = 0xD800 | (code / 0x400);
+				out[1] = 0xDC00 | (code & 0x3FF);
+
+				break;
+			}
+		}
+	}
+	if constexpr (std::is_same_v<T, char32_t>)
+	{
+		out[0] = static_cast<T>(in);
+	}
+}
+
+IMPL constexpr auto c_str<T, A>::codec::decode_ptr(const T* in, char32_t& out, int8_t size) noexcept -> void
+{
+	if constexpr (std::is_same_v<T, char>)
+	{
+		out = static_cast<char32_t>(in[0]);
+	}
+	if constexpr (std::is_same_v<T, char8_t>)
+	{
+		switch (size)
+		{
+			case 1:
+			{
+				out = static_cast<char32_t>(in[0]);
+
+				break;
+			}
+			case 2:
+			{
+				out = ((in[0] & 0x1F) << 06)
+				      |
+				      ((in[1] & 0x3F) << 00);
+
+				break;
+			}
+			case 3:
+			{
+				out = ((in[0] & 0x0F) << 12)
+				      |
+				      ((in[1] & 0x3F) << 06)
+				      |
+				      ((in[2] & 0x3F) << 00);
+
+				break;
+			}
+			case 4:
+			{
+				out = ((in[0] & 0x07) << 18)
+				      |
+				      ((in[1] & 0x3F) << 12)
+				      |
+				      ((in[2] & 0x3F) << 06)
+				      |
+				      ((in[3] & 0x3F) << 00);
+
+				break;
+			}
+		}
+	}
+	if constexpr (std::is_same_v<T, char16_t>)
+	{
+		switch (size)
+		{
+			case 1:
+			{
+				out = static_cast<char32_t>(in[0]);
+
+				break;
+			}
+			case 2:
+			{
+				out = 0x10000 // supplymentary
+				      |
+				      ((in[0] - 0xD800) << 10)
+				      |
+				      ((in[1] - 0xDC00) << 00);
+
+				break;
+			}
+		}
+	}
+	if constexpr (std::is_same_v<T, char32_t>)
+	{
+		out = static_cast<char32_t>(in[0]);
+	}
+}
+
+#pragma endregion codec
+
+#pragma region cursor
+
+IMPL constexpr auto c_str<T, A>::cursor::operator*() noexcept -> char32_t
+{
+	char32_t code;
+
+	const auto size {codec::next(this->ptr)};
+	codec::decode_ptr(this->ptr, code, size);
+
+	return code;
+}
+
+IMPL constexpr auto c_str<T, A>::cursor::operator&() noexcept -> const T*
+{
+	return this->ptr;
+}
+
+IMPL constexpr auto c_str<T, A>::cursor::operator++(   ) noexcept -> cursor&
+{
+	this->ptr += codec::next(this->ptr); return *this;
+}
+
+IMPL constexpr auto c_str<T, A>::cursor::operator++(int) noexcept -> cursor
+{
+	const auto clone {*this}; operator++(); return clone;
+}
+
+IMPL constexpr auto c_str<T, A>::cursor::operator--(   ) noexcept -> cursor&
+{
+	this->ptr += codec::back(this->ptr); return *this;
+}
+
+IMPL constexpr auto c_str<T, A>::cursor::operator--(int) noexcept -> cursor
+{
+	const auto clone {*this}; operator--(); return clone;
+}
+
+IMPL constexpr auto c_str<T, A>::cursor::operator==(const cursor& rhs) noexcept -> bool
+{
+	return this->ptr == rhs.ptr;
+}
+
+IMPL constexpr auto c_str<T, A>::cursor::operator!=(const cursor& rhs) noexcept -> bool
+{
+	return this->ptr != rhs.ptr;
+}
+
+#pragma endregion cursor
+
 #pragma region c_str
 
 IMPL constexpr auto c_str<T, A>::size() const noexcept -> size_t
@@ -1413,308 +1703,6 @@ IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value)       noexcept 
 
 #pragma endregion slice
 
-#pragma region c_str::codec
-
-IMPL constexpr auto c_str<T, A>::codec::size(char32_t code) noexcept -> int8_t
-{
-	if constexpr (std::is_same_v<T, char>)
-	{
-		return 1;
-	}
-	if constexpr (std::is_same_v<T, char8_t>)
-	{
-		const auto N {std::bit_width
-		(static_cast<uint32_t>(code))};
-
-		//|-----------------------|
-		//| U+000000 ... U+00007F | -> 1 code unit
-		//| U+000080 ... U+0007FF | -> 2 code unit
-		//| U+000800 ... U+00FFFF | -> 3 code unit
-		//| U+010000 ... U+10FFFF | -> 4 code unit
-		//|-----------------------|
-
-		return 1 + (8 <= N) + (12 <= N) + (17 <= N);
-	}
-	if constexpr (std::is_same_v<T, char16_t>)
-	{
-		//|-----------------------|
-		//| U+000000 ... U+00D7FF | -> 1 code unit
-		//| U+00E000 ... U+00FFFF | -> 1 code unit
-		//| U+000000 ... U+10FFFF | -> 2 code unit
-		//|-----------------------|
-
-		return 1 + (0xFFFF /* surrogate */ < code);
-	}
-	if constexpr (std::is_same_v<T, char32_t>)
-	{
-		return 1;
-	}
-}
-
-IMPL constexpr auto c_str<T, A>::codec::next(const T* ptr) noexcept -> int8_t
-{
-	constexpr static const int8_t TABLE[]
-	{
-		/*| 0x0 |*/ 1, /*| 0x1 |*/ 1,
-		/*| 0x2 |*/ 1, /*| 0x3 |*/ 1,
-		/*| 0x4 |*/ 1, /*| 0x5 |*/ 1,
-		/*| 0x6 |*/ 1, /*| 0x7 |*/ 1,
-		/*| 0x8 |*/ 1, /*| 0x9 |*/ 1,
-		/*| 0xA |*/ 1, /*| 0xB |*/ 1,
-		/*| 0xC |*/ 2, /*| 0xD |*/ 2,
-		/*| 0xE |*/ 3, /*| 0xF |*/ 4,
-	};
-
-	if constexpr (std::is_same_v<T, char>)
-	{
-		return 1;
-	}
-	if constexpr (std::is_same_v<T, char8_t>)
-	{
-		// branchless programming for utf-8
-		return TABLE[(ptr[0] >> 0x4) & 0x0F];
-	}
-	if constexpr (std::is_same_v<T, char16_t>)
-	{
-		// branchless programming for utf-16
-		return 1 + ((ptr[0] >> 0xA) == 0x36);
-	}
-	if constexpr (std::is_same_v<T, char32_t>)
-	{
-		return 1;
-	}
-}
-
-IMPL constexpr auto c_str<T, A>::codec::back(const T* ptr) noexcept -> int8_t
-{
-	if constexpr (std::is_same_v<T, char>)
-	{
-		return -1;
-	}
-	if constexpr (std::is_same_v<T, char8_t>)
-	{
-		// walk backward until non-continuation code unit is found
-		int8_t i {-1}; for (; (ptr[i] & 0xC0) == 0x80; --i) {} return i;
-	}
-	if constexpr (std::is_same_v<T, char16_t>)
-	{
-		// walk backward until encountering leading surrogate is found
-		int8_t i {-1}; for (; (ptr[i] >> 0xA) == 0x37; --i) {} return i;
-	}
-	if constexpr (std::is_same_v<T, char32_t>)
-	{
-		return -1;
-	}
-}
-
-IMPL constexpr auto c_str<T, A>::codec::encode_ptr(const char32_t in, T* out, int8_t size) noexcept -> void
-{
-	if constexpr (std::is_same_v<T, char>)
-	{
-		out[0] = static_cast<T>(in);
-	}
-	if constexpr (std::is_same_v<T, char8_t>)
-	{
-		switch (size)
-		{
-			case 1:
-			{
-				out[0] = static_cast<T>(in);
-
-				break;
-			}
-			case 2:
-			{
-				out[0] = 0xC0 | ((in >> 06) & 0x1F);
-				out[1] = 0x80 | ((in >> 00) & 0x3F);
-
-				break;
-			}
-			case 3:
-			{
-				out[0] = 0xE0 | ((in >> 12) & 0x0F);
-				out[1] = 0x80 | ((in >> 06) & 0x3F);
-				out[2] = 0x80 | ((in >> 00) & 0x3F);
-
-				break;
-			}
-			case 4:
-			{
-				out[0] = 0xF0 | ((in >> 18) & 0x07);
-				out[1] = 0x80 | ((in >> 12) & 0x3F);
-				out[2] = 0x80 | ((in >> 06) & 0x3F);
-				out[3] = 0x80 | ((in >> 00) & 0x3F);
-
-				break;
-			}
-		}
-	}
-	if constexpr (std::is_same_v<T, char16_t>)
-	{
-		switch (size)
-		{
-			case 1:
-			{
-				out[0] = static_cast<T>(in);
-
-				break;
-			}
-			case 2:
-			{
-				const auto code {in - 0x10000};
-
-				out[0] = 0xD800 | (code / 0x400);
-				out[1] = 0xDC00 | (code & 0x3FF);
-
-				break;
-			}
-		}
-	}
-	if constexpr (std::is_same_v<T, char32_t>)
-	{
-		out[0] = static_cast<T>(in);
-	}
-}
-
-IMPL constexpr auto c_str<T, A>::codec::decode_ptr(const T* in, char32_t& out, int8_t size) noexcept -> void
-{
-	if constexpr (std::is_same_v<T, char>)
-	{
-		out = static_cast<char32_t>(in[0]);
-	}
-	if constexpr (std::is_same_v<T, char8_t>)
-	{
-		switch (size)
-		{
-			case 1:
-			{
-				out = static_cast<char32_t>(in[0]);
-
-				break;
-			}
-			case 2:
-			{
-				out = ((in[0] & 0x1F) << 06)
-				      |
-				      ((in[1] & 0x3F) << 00);
-
-				break;
-			}
-			case 3:
-			{
-				out = ((in[0] & 0x0F) << 12)
-				      |
-				      ((in[1] & 0x3F) << 06)
-				      |
-				      ((in[2] & 0x3F) << 00);
-
-				break;
-			}
-			case 4:
-			{
-				out = ((in[0] & 0x07) << 18)
-				      |
-				      ((in[1] & 0x3F) << 12)
-				      |
-				      ((in[2] & 0x3F) << 06)
-				      |
-				      ((in[3] & 0x3F) << 00);
-
-				break;
-			}
-		}
-	}
-	if constexpr (std::is_same_v<T, char16_t>)
-	{
-		switch (size)
-		{
-			case 1:
-			{
-				out = static_cast<char32_t>(in[0]);
-
-				break;
-			}
-			case 2:
-			{
-				out = 0x10000 // supplymentary
-				      |
-				      ((in[0] - 0xD800) << 10)
-				      |
-				      ((in[1] - 0xDC00) << 00);
-
-				break;
-			}
-		}
-	}
-	if constexpr (std::is_same_v<T, char32_t>)
-	{
-		out = static_cast<char32_t>(in[0]);
-	}
-}
-
-#pragma endregion c_str::codec
-
-#pragma region c_str::cursor
-
-IMPL constexpr auto c_str<T, A>::cursor::operator*() noexcept -> char32_t
-{
-	char32_t code;
-
-	const auto size {codec::next(this->ptr)};
-	codec::decode_ptr(this->ptr, code, size);
-
-	return code;
-}
-
-IMPL constexpr auto c_str<T, A>::cursor::operator&() noexcept -> const T*
-{
-	return this->ptr;
-}
-
-IMPL constexpr auto c_str<T, A>::cursor::operator++(   ) noexcept -> cursor&
-{
-	this->ptr += codec::next(this->ptr);
-
-	return *this;
-}
-
-IMPL constexpr auto c_str<T, A>::cursor::operator++(int) noexcept -> cursor
-{
-	const auto clone {*this};
-
-	operator++();
-
-	return clone;
-}
-
-IMPL constexpr auto c_str<T, A>::cursor::operator--(   ) noexcept -> cursor&
-{
-	this->ptr += codec::back(this->ptr);
-
-	return *this;
-}
-
-IMPL constexpr auto c_str<T, A>::cursor::operator--(int) noexcept -> cursor
-{
-	const auto clone {*this};
-
-	operator--();
-
-	return clone;
-}
-
-IMPL constexpr auto c_str<T, A>::cursor::operator==(const cursor& rhs) noexcept -> bool
-{
-	return this->ptr == rhs.ptr;
-}
-
-IMPL constexpr auto c_str<T, A>::cursor::operator!=(const cursor& rhs) noexcept -> bool
-{
-	return this->ptr != rhs.ptr;
-}
-
-#pragma endregion c_str::cursor
-
 #pragma region c_str::reader
 
 IMPL [[nodiscard]] constexpr c_str<T, A>::reader::operator char32_t() const&& noexcept
@@ -1911,9 +1899,9 @@ template<class S> auto fileof(const S& path) noexcept -> std::optional<std::vari
 		UTF32_LE = (5 << 4) | 4,
 	};
 
-	struct lambda
+	static const auto byte_order_mask
 	{
-		static auto byte_order_mask(std::ifstream& ifs) noexcept -> format
+		[](std::ifstream& ifs) noexcept -> format
 		{
 			char buffer[4];
 
@@ -1923,51 +1911,51 @@ template<class S> auto fileof(const S& path) noexcept -> std::optional<std::vari
 
 			// 00 00 FE FF
 			if (buffer[0] == '\x00'
-				&&
-				buffer[1] == '\x00'
-				&&
-				buffer[2] == '\xFE'
-				&&
-				buffer[3] == '\xFF') [[unlikely]] return UTF32_BE;
+			    &&
+			    buffer[1] == '\x00'
+			    &&
+			    buffer[2] == '\xFE'
+			    &&
+			    buffer[3] == '\xFF') [[unlikely]] return UTF32_BE;
 
 			// FF FE 00 00
 			if (buffer[0] == '\xFF'
-				&&
-				buffer[1] == '\xFE'
-				&&
-				buffer[2] == '\x00'
-				&&
-				buffer[3] == '\x00') [[unlikely]] return UTF32_LE;
+			    &&
+			    buffer[1] == '\xFE'
+			    &&
+			    buffer[2] == '\x00'
+			    &&
+			    buffer[3] == '\x00') [[unlikely]] return UTF32_LE;
 
 			// FE FF
 			if (buffer[0] == '\xFE'
-				&&
-				buffer[1] == '\xFF') [[unlikely]] return UTF16_BE;
+			    &&
+			    buffer[1] == '\xFF') [[unlikely]] return UTF16_BE;
 
 			// FF FE
 			if (buffer[0] == '\xFF'
-				&&
-				buffer[1] == '\xFE') [[unlikely]] return UTF16_LE;
+			    &&
+			    buffer[1] == '\xFE') [[unlikely]] return UTF16_LE;
 
 			// EF BB BF
 			if (buffer[0] == '\xEF'
-				&&
-				buffer[1] == '\xBB'
-				&&
-				buffer[2] == '\xBF') [[unlikely]] return UTF8_BOM;
+			    &&
+			    buffer[1] == '\xBB'
+			    &&
+			    buffer[2] == '\xBF') [[unlikely]] return UTF8_BOM;
 
 			return UTF8_STD;
 		}
+	};
 
-		// for utf-8
-		static auto write_as_native(std::ifstream& ifs, c_str<char8_t>& str) noexcept
+	static const auto write_as_native
+	{
+		[]<class T>(std::ifstream& ifs, c_str<T>& str) noexcept -> void
 		{
-			typedef char8_t T; T buffer;
+			T buffer;
 
-			T* foo;
-			T* bar;
-
-			foo = bar = str.store.head();
+			auto* foo {str.store.head()};
+			auto* bar {str.store.head()};
 
 			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
 			{
@@ -1983,140 +1971,39 @@ template<class S> auto fileof(const S& path) noexcept -> std::optional<std::vari
 			}
 			// fix invariant
 			str.__size__(foo - bar);
-		}
-
-		// for utf-16
-		static auto write_as_native(std::ifstream& ifs, c_str<char16_t>& str) noexcept
-		{
-			typedef char16_t T; T buffer;
-
-			T* foo;
-			T* bar;
-
-			foo = bar = str.store.head();
-
-			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
-			{
-				if (buffer == '\r'
-				    &&
-				    ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T))
-				    &&
-				    buffer != '\n')
-				{
-					*(foo++) = '\n';
-				}
-				*(foo++) = buffer;
-			}
-			// fix invariant
-			str.__size__(foo - bar);
-		}
-
-		// for utf-32
-		static auto write_as_native(std::ifstream& ifs, c_str<char32_t>& str) noexcept
-		{
-			typedef char32_t T; T buffer;
-
-			T* foo;
-			T* bar;
-
-			foo = bar = str.store.head();
-
-			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
-			{
-				if (buffer == '\r'
-				    &&
-				    ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T))
-				    &&
-				    buffer != '\n')
-				{
-					*(foo++) = '\n';
-				}
-				*(foo++) = buffer;
-			}
-			// fix invariant
-			str.__size__(foo - bar);
-		}
-
-		// for utf-8
-		static auto write_as_foreign(std::ifstream& ifs, c_str<char8_t>& str) noexcept
-		{
-			typedef char8_t T; T buffer;
-
-			T* foo;
-			T* bar;
-
-			foo = bar = str.store.head();
-
-			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
-			{
-				if ((buffer = std::byteswap(buffer)) == '\r'
-				    &&
-				    ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T))
-				    &&
-				    (buffer = std::byteswap(buffer)) != '\n')
-				{
-					*(foo++) = '\n';
-				}
-				*(foo++) = buffer;
-			}
-			// fix invariant
-			str.__size__(foo - bar);
-		}
-
-		// for utf-16
-		static auto write_as_foreign(std::ifstream& ifs, c_str<char16_t>& str) noexcept
-		{
-			typedef char16_t T; T buffer;
-
-			T* foo;
-			T* bar;
-
-			foo = bar = str.store.head();
-
-			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
-			{
-				if ((buffer = std::byteswap(buffer)) == '\r'
-				    &&
-				    ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T))
-				    &&
-				    (buffer = std::byteswap(buffer)) != '\n')
-				{
-					*(foo++) = '\n';
-				}
-				*(foo++) = buffer;
-			}
-		}
-
-		// for utf-32
-		static auto write_as_foreign(std::ifstream& ifs, c_str<char32_t>& str) noexcept
-		{
-			typedef char32_t T; T buffer;
-
-			T* foo;
-			T* bar;
-
-			foo = bar = str.store.head();
-
-			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
-			{
-				if ((buffer = std::byteswap(buffer)) == '\r'
-				    &&
-				    ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T))
-				    &&
-				    (buffer = std::byteswap(buffer)) != '\n')
-				{
-					*(foo++) = '\n';
-				}
-				*(foo++) = buffer;
-			}
 		}
 	};
 
+	static const auto write_as_foreign
+	{
+		[]<class T>(std::ifstream& ifs, c_str<T>& str) noexcept -> void
+		{
+			T buffer;
+
+			auto* foo {str.store.head()};
+			auto* bar {str.store.head()};
+
+			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
+			{
+				if ((buffer = std::byteswap(buffer)) == '\r'
+				    &&
+				    ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T))
+				    &&
+				    (buffer = std::byteswap(buffer)) != '\n')
+				{
+					*(foo++) = '\n';
+				}
+				*(foo++) = buffer;
+			}
+			// fix invariant
+			str.__size__(foo - bar);
+		}
+	};
 
 	if (std::ifstream ifs {path, std::ios::binary})
 	{
-		const auto BOM {lambda::byte_order_mask(ifs)};
-		const auto off {BOM & 0xF /* bitwise hack */};
+		const auto BOM {byte_order_mask(ifs)};
+		const auto off {BOM & 0xF /* ..?? */};
 
 		size_t max;
 
@@ -2142,8 +2029,8 @@ template<class S> auto fileof(const S& path) noexcept -> std::optional<std::vari
 
 				str.capacity((max / sizeof(char8_t)) + 1);
 
-				if constexpr (!IS_BIG) lambda::write_as_native(ifs, str);
-				                  else lambda::write_as_native(ifs, str);
+				if constexpr (!IS_BIG) write_as_native(ifs, str);
+				                  else write_as_native(ifs, str);
 
 				return str;
 			}
@@ -2153,8 +2040,8 @@ template<class S> auto fileof(const S& path) noexcept -> std::optional<std::vari
 
 				str.capacity((max / sizeof(char8_t)) + 1);
 
-				if constexpr (IS_BIG) lambda::write_as_native(ifs, str);
-				                 else lambda::write_as_native(ifs, str);
+				if constexpr (IS_BIG) write_as_native(ifs, str);
+				                 else write_as_native(ifs, str);
 
 				return str;
 			}
@@ -2164,8 +2051,8 @@ template<class S> auto fileof(const S& path) noexcept -> std::optional<std::vari
 
 				str.capacity((max / sizeof(char16_t)) + 1);
 
-				if constexpr (!IS_BIG) lambda::write_as_native(ifs, str);
-				                  else lambda::write_as_foreign(ifs, str);
+				if constexpr (!IS_BIG) write_as_native(ifs, str);
+				                  else write_as_foreign(ifs, str);
 
 				return str;
 			}
@@ -2175,8 +2062,8 @@ template<class S> auto fileof(const S& path) noexcept -> std::optional<std::vari
 
 				str.capacity((max / sizeof(char16_t)) + 1);
 
-				if constexpr (IS_BIG) lambda::write_as_native(ifs, str);
-				                 else lambda::write_as_foreign(ifs, str);
+				if constexpr (IS_BIG) write_as_native(ifs, str);
+				                 else write_as_foreign(ifs, str);
 
 				return str;
 			}
@@ -2186,8 +2073,8 @@ template<class S> auto fileof(const S& path) noexcept -> std::optional<std::vari
 
 				str.capacity((max / sizeof(char32_t)) + 1);
 
-				if constexpr (!IS_BIG) lambda::write_as_native(ifs, str);
-				                  else lambda::write_as_foreign(ifs, str);
+				if constexpr (!IS_BIG) write_as_native(ifs, str);
+				                  else write_as_foreign(ifs, str);
 
 				return str;
 			}
@@ -2197,8 +2084,8 @@ template<class S> auto fileof(const S& path) noexcept -> std::optional<std::vari
 
 				str.capacity((max / sizeof(char32_t)) + 1);
 
-				if constexpr (IS_BIG) lambda::write_as_native(ifs, str);
-				                 else lambda::write_as_foreign(ifs, str);
+				if constexpr (IS_BIG) write_as_native(ifs, str);
+				                 else write_as_foreign(ifs, str);
 
 				return str;
 			}
