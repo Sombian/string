@@ -7,21 +7,13 @@
 
 #include "string.hpp"
 
-TEST_CASE("invariant")
+TEST_CASE("capacity")
 {
-	SUBCASE("empty string")
-	{
-		c_str str {/* none */};
+	c_str small {"ABCDEFGHIJKLMNOPQRSTUVW"};
+	c_str large {"ÁBCDEFGHIJKLMNOPQRSTUVW"};
 
-		CHECK(str.size() == 0);
-	}
-
-	SUBCASE("0 < str.size()")
-	{
-		c_str str {"foo bar"};
-
-		CHECK(str.size() == 8);
-	}
+	CHECK(small.size() == small.capacity());
+	CHECK(large.size() == large.capacity());
 }
 
 TEST_CASE("equality")
@@ -40,25 +32,34 @@ TEST_CASE("equality")
 
 	SUBCASE("A + A")
 	{
-		CHECK(foo + foo == "foofoo");
-		CHECK("foofoo" == foo + foo);
+		c_str foo_foo {foo + foo};
 
-		CHECK(foo + bar == "foobar");
-		CHECK("foobar" == foo + bar);
+		CHECK(foo_foo == "foofoo");
+		CHECK("foofoo" == foo_foo);
+
+		c_str foo_bar {foo + bar};
+
+		CHECK(foo_bar == "foobar");
+		CHECK("foobar" == foo_bar);
 	}
 
+	#ifndef _MSC_VER
 	SUBCASE("slice")
 	{
 		utf8 str {u8"티라미수☆치즈케잌"};
 
 		auto parts {str.split(u8"☆")};
 
-		CHECK(parts[0] == u8"티라미수");
-		CHECK(parts[0].length() == 4);
+		const auto 티라미수 {parts[0]};
+		const auto 치즈케잌 {parts[1]};
 
-		CHECK(parts[1] == u8"치즈케잌");
-		CHECK(parts[1].length() == 4);
+		CHECK(티라미수 == u8"티라미수");
+		CHECK(티라미수.length() == 4);
+
+		CHECK(치즈케잌 == u8"치즈케잌");
+		CHECK(치즈케잌.length() == 4);
 	}
+	#endif//_MSC_VER
 }
 
 TEST_CASE("fileof")
