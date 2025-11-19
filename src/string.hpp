@@ -1,3 +1,5 @@
+// NOLINTBEGIN(*-magic-numbers, *-union-access, *-signed-bitwise, *-avoid-c-arrays, *-pointer-arithmetic, *-constant-array-index, *-explicit-conversions)
+
 #pragma once
 
 #include <bit>
@@ -16,8 +18,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
-
-// NOLINTBEGIN(*-avoid-c-arrays, *-explicit-conversions, *-identifier-length, *non-private*)
 
 //|----------------------------------------------------------------------------------------|
 //| special thanks to facebook's folly::FBString.                                          |
@@ -38,8 +38,7 @@
 #define COPY_CONSTRUCTOR(T) constexpr T(const T& other) noexcept
 #define MOVE_CONSTRUCTOR(T) constexpr T(T&& other) noexcept
 
-// turn logical code point into utf8 code units
-auto operator<<(std::ostream& os, char32_t code) -> std::ostream&
+inline auto operator<<(std::ostream& os, char32_t code) -> std::ostream&
 {
 	char out[4]; short unit {0};
 
@@ -380,15 +379,15 @@ public:
 		static constexpr auto decode_ptr(const T* in, char32_t& out, int8_t size) noexcept -> void;
 	};
 
-	// returns the content of a file with LF to CRLF normalization.
+	// returns the content of a file with CR or CRLF to LF normalization.
 	template<class S> friend auto file_of(const S& path) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
-	// returns the content of a file with LF to CRLF normalization.
+	// returns the content of a file with CR or CRLF to LF normalization.
 	template<size_t N> friend auto file_of(const char (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
-	// returns the content of a file with LF to CRLF normalization.
+	// returns the content of a file with CR or CRLF to LF normalization.
 	template<size_t N> friend auto file_of(const char8_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
-	// returns the content of a file with LF to CRLF normalization.
+	// returns the content of a file with CR or CRLF to LF normalization.
 	template<size_t N> friend auto file_of(const char16_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
-	// returns the content of a file with LF to CRLF normalization.
+	// returns the content of a file with CR or CRLF to LF normalization.
 	template<size_t N> friend auto file_of(const char32_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
 
 	// convertion
@@ -823,7 +822,7 @@ public:
 	template<size_t N>
 	friend constexpr auto operator==(const T (&lhs)[N], const c_str& rhs) noexcept -> bool
 	{
-		return N == rhs.size() + 1 && std::ranges::equal
+		return N == rhs.size() && std::ranges::equal
 		(
 			&lhs[0], &lhs[N - 1],
 			rhs.store.head(), rhs.store.tail() - 1
@@ -854,20 +853,20 @@ public:
 
 	friend constexpr auto operator!=(const c_str& lhs, const c_str& rhs) noexcept -> bool
 	{
-		return &lhs != &rhs || lhs.size() != rhs.size() || !std::ranges::equal
+		return &lhs != &rhs && (lhs.size() != rhs.size() || !std::ranges::equal
 		(
 			lhs.store.head(), lhs.store.tail() - 1,
 			rhs.store.head(), rhs.store.tail() - 1
-		);
+		));
 	}
 
 	friend constexpr auto operator!=(const slice& lhs, const slice& rhs) noexcept -> bool
 	{
-		return &lhs != &rhs || lhs.size() != rhs.size() || !std::ranges::equal
+		return &lhs != &rhs && (lhs.size() != rhs.size() || !std::ranges::equal
 		(
 			lhs.head, lhs.tail,
 			rhs.head, rhs.tail
-		);
+		));
 	}
 	
 	friend constexpr auto operator!=(const c_str& lhs, const slice& rhs) noexcept -> bool
@@ -2105,7 +2104,7 @@ IMPL [[nodiscard]] constexpr c_str<T, A>::reader::operator char32_t() const&& no
 			head += this->nth;
 			goto __SHORTCUT__;
 		}
-		return U'�';
+		return U'\uFFFD';
 	}
 
 	for (; head < tail; ++i, head += codec::next(head))
@@ -2122,7 +2121,7 @@ IMPL [[nodiscard]] constexpr c_str<T, A>::reader::operator char32_t() const&& no
 			return code;
 		}
 	}
-	return U'�';
+	return U'\uFFFD';
 }
 
 #pragma endregion c_str::reader
@@ -2232,7 +2231,7 @@ IMPL [[nodiscard]] constexpr c_str<T, A>::slice::reader::operator char32_t() con
 			head += this->nth;
 			goto __SHORTCUT__;
 		}
-		return U'�';
+		return U'\uFFFD';
 	}
 
 	for (; head < tail; ++i, head += codec::next(head))
@@ -2249,12 +2248,12 @@ IMPL [[nodiscard]] constexpr c_str<T, A>::slice::reader::operator char32_t() con
 			return code;
 		}
 	}
-	return U'�';
+	return U'\uFFFD';
 }
 
 #pragma endregion slice::reader
 
-// NOLINTEND(*-avoid-c-arrays, *-explicit-conversions, *-identifier-length, *non-private*)
+#undef IMPL
 
 #undef COPY_PTR_LOGIC
 #undef SWAP_PTR_LOGIC
@@ -2272,13 +2271,9 @@ typedef c_str<char16_t> utf16;
 // https://en.wikipedia.org/wiki/UTF-32
 typedef c_str<char32_t> utf32;
 
-#undef IMPL
-
-#pragma region filesystem
-
 template<class S> auto file_of(const S& path) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
 {
-	enum format
+	enum format : uint8_t
 	{
 		UTF8_STD = (0 << 4) | 0,
 		UTF8_BOM = (1 << 4) | 3,
@@ -2585,28 +2580,24 @@ template<class S> auto file_of(const S& path) noexcept -> std::optional<std::var
 	return std::nullopt;
 }
 
-// returns the content of a file. if BOM is N/A, it falls back to utf-8 encoding.
-template<size_t N> auto file_of(const char (&in)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+template<size_t N> auto file_of(const char (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
 {
-	return file_of(c_str {in});
+	return file_of(c_str {path});
 }
 
-// returns the content of a file. if BOM is N/A, it falls back to utf-8 encoding.
-template<size_t N> auto file_of(const char8_t (&in)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+template<size_t N> auto file_of(const char8_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
 {
-	return file_of(utf8 {in});
+	return file_of(utf8 {path});
 }
 
-// returns the content of a file. if BOM is N/A, it falls back to utf-8 encoding.
-template<size_t N> auto file_of(const char16_t (&in)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+template<size_t N> auto file_of(const char16_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
 {
-	return file_of(utf16 {in});
+	return file_of(utf16 {path});
 }
 
-// returns the content of a file. if BOM is N/A, it falls back to utf-8 encoding.
-template<size_t N> auto file_of(const char32_t (&in)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+template<size_t N> auto file_of(const char32_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
 {
-	return file_of(utf32 {in});
+	return file_of(utf32 {path});
 }
 
-#pragma endregion filesystem
+// NOLINTEND(*-magic-numbers, *-union-access, *-signed-bitwise, *-avoid-c-arrays, *-pointer-arithmetic, *-constant-array-index, *-explicit-conversions)

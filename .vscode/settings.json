@@ -5,5 +5,7 @@
 		"out": true,
 		"build": true,
 		".cache": true,
+		// git submodule
+		"pkg/*/*": true,
 	},
 }
