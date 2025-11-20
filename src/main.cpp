@@ -2,7 +2,6 @@
 
 #include "doctest.h"
 
-#include <utility>
 #include <variant>
 
 #include "string.hpp"
@@ -43,7 +42,6 @@ TEST_CASE("equality")
 		CHECK("foobar" == foo_bar);
 	}
 
-	#ifndef _MSC_VER
 	SUBCASE("slice")
 	{
 		utf8 str {u8"티라미수☆치즈케잌"};
@@ -59,12 +57,11 @@ TEST_CASE("equality")
 		CHECK(치즈케잌 == u8"치즈케잌");
 		CHECK(치즈케잌.length() == 4);
 	}
-	#endif//_MSC_VER
 }
 
 TEST_CASE("subscript")
 {
-	utf8 str {u8"티라미수"};
+	utf8 str {u8"샤인모수끼"};
 
 	SUBCASE("read & write")
 	{
@@ -74,13 +71,39 @@ TEST_CASE("subscript")
 		CHECK((str[3] = U'잌') == U'잌');
 	}
 
-	SUBCASE("range syntax")
+	SUBCASE("(clamp, clamp)")
 	{
-		// using syntax::N;
+		using range::N;
 
-		// CHECK(str[0, 2] == u8"티라");
-		// CHECK(str[1, 3] == u8"라미");
-		// CHECK(str[2, N] == u8"미수");
+		CHECK(str[N - 3, N - 2] == u8"모");
+	}
+
+	SUBCASE("(clamp, range)")
+	{
+		using range::N;
+
+		CHECK(str[N - 3, N] == u8"모수끼");
+	}
+
+	SUBCASE("(size_t, clamp)")
+	{
+		using range::N;
+
+		CHECK(str[2, N - 1] == u8"모수");
+	}
+
+	SUBCASE("(size_t, range)")
+	{
+		using range::N;
+
+		CHECK(str[2, N] == u8"모수끼");
+	}
+
+	SUBCASE("(size_t, size_t)")
+	{
+		using range::N;
+
+		CHECK(str[2, 3] == u8"모");
 	}
 }
 
@@ -88,43 +111,28 @@ TEST_CASE("fileof")
 {
 	SUBCASE("UTF-8")
 	{
-		utf8 path {u8"sample/utf8.txt"};
+		const auto file {fileof("./src/sample/utf8.txt")};
 
-		if (auto file {fileof(path)})
-		{
-			std::visit([&](auto&& _)
-			{
-				CHECK(std::is_same_v<decltype(_), utf8>);
-			},
-			std::move(file.value()));
-		}
+		REQUIRE(file.has_value());
+
+		CHECK(std::holds_alternative<utf8>(file.value()));
 	}
 
 	SUBCASE("UTF-16-LE")
 	{
-		utf8 path {u8"sample/utf16le.txt"};
+		const auto file {fileof("./src/sample/utf16le.txt")};
 
-		if (auto file {fileof(path)})
-		{
-			std::visit([&](auto&& _)
-			{
-				CHECK(std::is_same_v<decltype(_), utf16>);
-			},
-			std::move(file.value()));
-		}
+		REQUIRE(file.has_value());
+
+		CHECK(std::holds_alternative<utf16>(file.value()));
 	}
 
 	SUBCASE("UTF-16-BE")
 	{
-		utf8 path {u8"test/utf16be.txt"};
+		const auto file {fileof("./src/sample/utf16be.txt")};
 
-		if (auto file {fileof(path)})
-		{
-			std::visit([&](auto&& _)
-			{
-				CHECK(std::is_same_v<decltype(_), utf16>);
-			},
-			std::move(file.value()));
-		}
+		REQUIRE(file.has_value());
+
+		CHECK(std::holds_alternative<utf16>(file.value()));
 	}
 }
