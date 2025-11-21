@@ -1,3 +1,7 @@
+[![hits](https://hits.sh/github.com/Sombian/string.svg)]()
+[![test](https://badgen.net/github/stars/Sombian/string)]()
+[![test](https://badgen.net/github/forks/Sombian/string)]()
+
 requires **C++23** ot later.
 
 ```c++
@@ -51,7 +55,7 @@ std::cout << str[N - 5, N] << '\n';
 
 - [A, B]
 	- (getter)
-	- returns a slice in range, simmilar to that of Python's slicing.
+	- returns a slice in range, similar to that of Python's slicing.
 
 ### slice
 
@@ -85,4 +89,4 @@ std::cout << str[N - 5, N] << '\n';
 
 - [A, B]
 	- (getter)
-	- returns a slice in range, simmilar to that of Python's slicing.
+	- returns a slice in range, similar to that of Python's slicing.
