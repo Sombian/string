@@ -75,7 +75,7 @@ TEST_CASE("[API] fileof")
 {
 	SUBCASE("UTF-8")
 	{
-		const auto file {fileof("./src/sample/utf8.txt")};
+		const auto file {fileof(u8"./src/sample/utf8.txt")};
 
 		REQUIRE(file.has_value());
 

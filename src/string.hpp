@@ -13,6 +13,7 @@
 #include <optional>
 #include <concepts>
 #include <algorithm>
+#include <filesystem>
 
 #include <cstdio>
 #include <cassert>
@@ -2555,8 +2556,8 @@ auto constexpr c_str<T, A>::slice::reader::operator!=(char32_t code) const noexc
 #undef COPY_CONSTRUCTOR
 #undef MOVE_CONSTRUCTOR
 
-template<typename STRING   >
-//───────────୨ৎ───────────//
+template<typename STRING>
+// fs I/O at your service
 auto fileof(const STRING& path) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
 {
 	enum format : uint8_t
@@ -2678,7 +2679,34 @@ auto fileof(const STRING& path) noexcept -> std::optional<std::variant<c_str<cha
 		}
 	};
 
-	if (std::ifstream ifs {path, std::ios::binary})
+	const std::filesystem::path fs
+	{
+		[&]() -> std::filesystem::path
+		{
+			using file_t = decltype(fs);
+			using string = std::string;
+
+			// constructible on the fly - great news!
+			if constexpr (std::is_constructible_v<file_t, STRING>)
+			{
+				return path;
+			}
+			// at least convertible to file_t! - SFINAE
+			else if constexpr (std::is_convertible_v<STRING, file_t>)
+			{
+				return static_cast<file_t>(path);
+			}
+			// at least convertible to string! - SFINAE
+			else if constexpr (std::is_convertible_v<STRING, string>)
+			{
+				return static_cast<string>(path);
+			}
+			// ...SFINAE failuare! you cannot construct!
+			else static_assert(!"SFINAE failure! cannot construct!");
+		}()
+	};
+
+	if (std::ifstream ifs {fs, std::ios::binary})
 	{
 		const auto BOM {byte_order_mask(ifs)};
 		const auto off {BOM & 0xF /* ..?? */};
@@ -2771,13 +2799,6 @@ auto fileof(const STRING& path) noexcept -> std::optional<std::variant<c_str<cha
 		#undef IS_BIG
 	}
 	return std::nullopt;
-}
-
-template<unit_t T, size_t N>
-//───────────୨ৎ───────────//
-auto fileof(const T (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
-{
-	return fileof(c_str<T>(path));
 }
 
 // NOLINTEND(*-magic-numbers, *-union-access, *-signed-bitwise, *-avoid-c-arrays, *-pointer-arithmetic, *-constant-array-index, *-explicit-conversions)
