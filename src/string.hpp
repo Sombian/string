@@ -901,7 +901,7 @@ typedef c_str<char16_t> utf16;
 // https://en.wikipedia.org/wiki/UTF-32
 typedef c_str<char32_t> utf32;
 
-#pragma region core
+#pragma region logic
 
 template<unit_t T, allo_t A>
 template<unit_t U, allo_t B>
@@ -1439,108 +1439,7 @@ constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, size_t start
 	return {foo, bar};
 }
 
-#pragma endregion core
-
-#pragma region SSO
-
-template<unit_t T, allo_t A>
-//───────────୨ৎ───────────//
-constexpr c_str<T, A>::buffer::operator const T*() const noexcept
-{
-	return this->head;
-}
-
-template<unit_t T, allo_t A>
-//───────────୨ৎ───────────//
-constexpr c_str<T, A>::buffer::operator /*&*/ T*() /*&*/ noexcept
-{
-	return this->head;
-}
-
-template<unit_t T, allo_t A>
-//───────────୨ৎ───────────//
-constexpr c_str<T, A>::storage::storage() noexcept
-{
-	this->__union__.bytes[RMB] = MAX << SFT;
-}
-
-template<unit_t T, allo_t A>
-//───────────୨ৎ───────────//
-constexpr c_str<T, A>::storage::~storage() noexcept
-{
-	if (this->mode() == LARGE)
-	{
-		// ...release heap allocated memory
-		std::allocator_traits<A>::deallocate
-		(
-			(*this),
-			(*this).__union__.large.head,
-			(*this).__union__.large.tail
-			-
-			(*this).__union__.large.head
-		);
-	}
-}
-
-template<unit_t T, allo_t A>
-//───────────୨ৎ───────────//
-constexpr auto c_str<T, A>::storage::mode() const noexcept -> mode_t
-{
-	return static_cast<mode_t>(this->__union__.bytes[RMB] & MSK);
-}
-
-template<unit_t T, allo_t A>
-//───────────୨ৎ───────────//
-constexpr auto c_str<T, A>::storage::mode() /*&*/ noexcept -> mode_t
-{
-	return static_cast<mode_t>(this->__union__.bytes[RMB] & MSK);
-}
-
-template<unit_t T, allo_t A>
-//───────────୨ৎ───────────//
-constexpr auto c_str<T, A>::head() const noexcept -> const T*
-{
-	return this->store.mode() == SMALL
-	       ?
-	       &this->store.__union__.small[0 /* ✨ roeses are red, violets are blue ✨ */]
-	       :
-	       &this->store.__union__.large[0 /* ✨ roeses are red, violets are blue ✨ */];
-}
-
-template<unit_t T, allo_t A>
-//───────────୨ৎ───────────//
-constexpr auto c_str<T, A>::head() /*&*/ noexcept -> /*&*/ T*
-{
-	return this->store.mode() == SMALL
-	       ?
-	       &this->store.__union__.small[0 /* ✨ roeses are red, violets are blue ✨ */]
-	       :
-	       &this->store.__union__.large[0 /* ✨ roeses are red, violets are blue ✨ */];
-}
-
-template<unit_t T, allo_t A>
-//───────────୨ৎ───────────//
-constexpr auto c_str<T, A>::tail() const noexcept -> const T*
-{
-	return this->store.mode() == SMALL
-	       ?
-	       &this->store.__union__.small[MAX - (this->store.__union__.bytes[RMB] >> SFT)]
-	       :
-	       &this->store.__union__.large[0x0 + (this->store.__union__.large.size >> 0x0)];
-}
-
-template<unit_t T, allo_t A>
-//───────────୨ৎ───────────//
-constexpr auto c_str<T, A>::tail() /*&*/ noexcept -> /*&*/ T*
-{
-	return this->store.mode() == SMALL
-	       ?
-	       &this->store.__union__.small[MAX - (this->store.__union__.bytes[RMB] >> SFT)]
-	       :
-	       &this->store.__union__.large[0x0 + (this->store.__union__.large.size >> 0x0)];
-}
-
-#pragma endregion SSO
+#pragma endregion logic
 
 #pragma region codec
 
@@ -1792,6 +1691,107 @@ constexpr auto c_str<T, A>::codec::decode_ptr(const T* in, char32_t& out, int8_t
 }
 
 #pragma endregion codec
+
+#pragma region SSO
+
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr c_str<T, A>::buffer::operator const T*() const noexcept
+{
+	return this->head;
+}
+
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr c_str<T, A>::buffer::operator /*&*/ T*() /*&*/ noexcept
+{
+	return this->head;
+}
+
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr c_str<T, A>::storage::storage() noexcept
+{
+	this->__union__.bytes[RMB] = MAX << SFT;
+}
+
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr c_str<T, A>::storage::~storage() noexcept
+{
+	if (this->mode() == LARGE)
+	{
+		// ...release heap allocated memory
+		std::allocator_traits<A>::deallocate
+		(
+			(*this),
+			(*this).__union__.large.head,
+			(*this).__union__.large.tail
+			-
+			(*this).__union__.large.head
+		);
+	}
+}
+
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::storage::mode() const noexcept -> mode_t
+{
+	return static_cast<mode_t>(this->__union__.bytes[RMB] & MSK);
+}
+
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::storage::mode() /*&*/ noexcept -> mode_t
+{
+	return static_cast<mode_t>(this->__union__.bytes[RMB] & MSK);
+}
+
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::head() const noexcept -> const T*
+{
+	return this->store.mode() == SMALL
+	       ?
+	       &this->store.__union__.small[0 /* ✨ roeses are red, violets are blue ✨ */]
+	       :
+	       &this->store.__union__.large[0 /* ✨ roeses are red, violets are blue ✨ */];
+}
+
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::head() /*&*/ noexcept -> /*&*/ T*
+{
+	return this->store.mode() == SMALL
+	       ?
+	       &this->store.__union__.small[0 /* ✨ roeses are red, violets are blue ✨ */]
+	       :
+	       &this->store.__union__.large[0 /* ✨ roeses are red, violets are blue ✨ */];
+}
+
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::tail() const noexcept -> const T*
+{
+	return this->store.mode() == SMALL
+	       ?
+	       &this->store.__union__.small[MAX - (this->store.__union__.bytes[RMB] >> SFT)]
+	       :
+	       &this->store.__union__.large[0x0 + (this->store.__union__.large.size >> 0x0)];
+}
+
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::tail() /*&*/ noexcept -> /*&*/ T*
+{
+	return this->store.mode() == SMALL
+	       ?
+	       &this->store.__union__.small[MAX - (this->store.__union__.bytes[RMB] >> SFT)]
+	       :
+	       &this->store.__union__.large[0x0 + (this->store.__union__.large.size >> 0x0)];
+}
+
+#pragma endregion SSO
 
 #pragma region cursor
 
