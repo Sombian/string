@@ -3,6 +3,7 @@
 #include "doctest.h"
 
 #include <variant>
+#include <utility>
 
 #include "string.hpp"
 
@@ -15,99 +16,62 @@ TEST_CASE("storage")
 	CHECK(large.size() == large.capacity());
 }
 
-TEST_CASE("equality")
+TEST_CASE("[API] string")
 {
-	c_str foo {"foo"};
-	c_str bar {"bar"};
-
-	SUBCASE("A == B")
+	SUBCASE("impl + ???")
 	{
-		CHECK(foo == "foo");
-		CHECK("foo" == foo);
+		const utf8 foo {u8"티라"};
+		const utf8 bar {u8"미수"};
 
-		CHECK(foo != "bar");
-		CHECK("bar" != foo);
+		auto foo_foo {foo + foo};
+		auto foo_bar {foo + bar};
+
+		CHECK(foo_foo == u8"티라티라");
+		CHECK(foo_foo.length() == 4);
+
+		CHECK(foo_bar == u8"티라미수");
+		CHECK(foo_bar.length() == 4);
 	}
 
-	SUBCASE("A + A")
+	SUBCASE("impl.split")
 	{
-		c_str foo_foo {foo + foo};
+		const utf8 str {u8"티라미수"
+		                  "☆"
+		                  "치즈케잌"
+		                  "☆"
+		                  "말차라떼"
+		                  "☆"
+		                  "딸기우유"};
 
-		CHECK(foo_foo == "foofoo");
-		CHECK("foofoo" == foo_foo);
+		// split by utf-16 literal
+		auto src {str.split(u"☆")};
 
-		c_str foo_bar {foo + bar};
-
-		CHECK(foo_bar == "foobar");
-		CHECK("foobar" == foo_bar);
+		CHECK(src[0] == u"티라미수");
+		CHECK(src[0] == U"티라미수");
+		CHECK(src[1] == u"치즈케잌");
+		CHECK(src[1] == U"치즈케잌");
+		CHECK(src[2] == u"말차라떼");
+		CHECK(src[2] == U"말차라떼");
+		CHECK(src[3] == u"딸기우유");
+		CHECK(src[3] == U"딸기우유");
 	}
 
-	SUBCASE("slice")
+	SUBCASE("range syntax")
 	{
-		utf8 str {u8"티라미수☆치즈케잌"};
+		// init from utf-16 literal
+		const utf8 str {u"샤인모수끼"};
 
-		auto parts {str.split(u8"☆")};
-
-		const auto 티라미수 {parts[0]};
-		const auto 치즈케잌 {parts[1]};
-
-		CHECK(티라미수 == u8"티라미수");
-		CHECK(티라미수.length() == 4);
-
-		CHECK(치즈케잌 == u8"치즈케잌");
-		CHECK(치즈케잌.length() == 4);
-	}
-}
-
-TEST_CASE("subscript")
-{
-	utf8 str {u8"샤인모수끼"};
-
-	SUBCASE("read & write")
-	{
-		CHECK((str[0] = U'치') == U'치');
-		CHECK((str[1] = U'즈') == U'즈');
-		CHECK((str[2] = U'케') == U'케');
-		CHECK((str[3] = U'잌') == U'잌');
-	}
-
-	SUBCASE("(clamp, clamp)")
-	{
 		using range::N;
 
 		CHECK(str[N - 3, N - 2] == u8"모");
-	}
-
-	SUBCASE("(clamp, range)")
-	{
-		using range::N;
-
-		CHECK(str[N - 3, N] == u8"모수끼");
-	}
-
-	SUBCASE("(size_t, clamp)")
-	{
-		using range::N;
-
-		CHECK(str[2, N - 1] == u8"모수");
-	}
-
-	SUBCASE("(size_t, range)")
-	{
-		using range::N;
-
-		CHECK(str[2, N] == u8"모수끼");
-	}
-
-	SUBCASE("(size_t, size_t)")
-	{
-		using range::N;
-
-		CHECK(str[2, 3] == u8"모");
+		CHECK(str[N - 3, N]  == u8"모수끼");
+		CHECK(str[2, N - 0]  == u8"모수끼");
+		CHECK(str[2, N]      == u8"모수끼");
+		CHECK(str[2, 3]         == u8"모");
 	}
 }
 
-TEST_CASE("fileof")
+TEST_CASE("[API] fileof")
 {
 	SUBCASE("UTF-8")
 	{

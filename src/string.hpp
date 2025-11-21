@@ -11,6 +11,7 @@
 #include <ostream>
 #include <fstream>
 #include <optional>
+#include <concepts>
 #include <algorithm>
 
 #include <cstdio>
@@ -71,6 +72,25 @@ inline auto operator<<(std::ostream& os, char32_t code) noexcept -> std::ostream
 	return os.write(out, unit);
 }
 
+template<typename T> concept unit_t = std::is_same_v<T, char    >
+                                      ||
+                                      std::is_same_v<T, char8_t >
+                                      ||
+                                      std::is_same_v<T, char16_t>
+                                      ||
+                                      std::is_same_v<T, char32_t>;
+
+template<typename T> concept allo_t = requires(T alloc, size_t N)
+{
+	typename std::allocator_traits<T>::size_type;
+	typename std::allocator_traits<T>::value_type;
+
+	{ alloc == alloc } -> std::same_as<bool>;
+	{ alloc != alloc } -> std::same_as<bool>;
+
+	{ std::allocator_traits<T>::allocate(alloc, N) };
+};
+
 enum class range : uint8_t {N};
 struct clamp { const size_t _;
 inline constexpr /**/ operator
@@ -81,19 +101,9 @@ inline constexpr auto operator-
 
 template
 <
-	class T = char /* legacy */,
-	class A = std::allocator<T>
+	unit_t T = char /* legacy */,
+	allo_t A = std::allocator<T>
 >
-requires
-(
-	std::is_same_v<T, char>
-	||
-	std::is_same_v<T, char8_t>
-	||
-	std::is_same_v<T, char16_t>
-	||
-	std::is_same_v<T, char32_t>
-)
 class c_str
 {
 	#define IS_BIG          \
@@ -193,36 +203,46 @@ class c_str
 		// returns the number of code points, excluding NULL-TERMINATOR.
 		constexpr auto length() const noexcept -> size_t;
 
-		// returns a list of string slice, of which are product of what remains after a split.
-		constexpr auto split(const c_str& value) const noexcept -> std::vector<slice>;
-		// returns a list of string slice, of which are product of what remains after a split.
-		constexpr auto split(const slice& value) const noexcept -> std::vector<slice>;
-		// returns a list of string slice, of which are product of what remains after a split.
-		template<size_t N>
-		constexpr auto split(const T (&value)[N]) const noexcept -> std::vector<slice>;
+		// returns a list of string slice, of which are product of split (division).
+		template<unit_t U, allo_t B>
+		constexpr auto split(const c_str<U, B>/*T^T*/& value) const noexcept -> std::vector<slice>;
+		// returns a list of string slice, of which are product of split (division).
+		template<unit_t U, allo_t B>
+		constexpr auto split(const c_str<U, B>::slice& value) const noexcept -> std::vector<slice>;
+		// returns a list of string slice, of which are product of split (division).
+		template<unit_t U, size_t N>
+		constexpr auto split(const U/*{literal}*/(&value)[N]) const noexcept -> std::vector<slice>;
 
 		// returns a list of string slice, of which are product of search occurrence.
-		constexpr auto match(const c_str& value) const noexcept -> std::vector<slice>;
+		template<unit_t U, allo_t B>
+		constexpr auto match(const c_str<U, B>/*T^T*/& value) const noexcept -> std::vector<slice>;
 		// returns a list of string slice, of which are product of search occurrence.
-		constexpr auto match(const slice& value) const noexcept -> std::vector<slice>;
+		template<unit_t U, allo_t B>
+		constexpr auto match(const c_str<U, B>::slice& value) const noexcept -> std::vector<slice>;
 		// returns a list of string slice, of which are product of search occurrence.
-		template<size_t N>
-		constexpr auto match(const T (&value)[N]) const noexcept -> std::vector<slice>;
+		template<unit_t U, size_t N>
+		constexpr auto match(const U/*{literal}*/(&value)[N]) const noexcept -> std::vector<slice>;
 
-		constexpr auto starts_with(const c_str& value) const noexcept -> bool;
-		constexpr auto starts_with(const slice& value) const noexcept -> bool;
-		template<size_t N>
-		constexpr auto starts_with(const T (&value)[N]) const noexcept -> bool;
+		template<unit_t U, allo_t B>
+		constexpr auto starts_with(const c_str<U, B>/*T^T*/& value) const noexcept -> bool;
+		template<unit_t U, allo_t B>
+		constexpr auto starts_with(const c_str<U, B>::slice& value) const noexcept -> bool;
+		template<unit_t U, size_t N>
+		constexpr auto starts_with(const U/*{literal}*/(&value)[N]) const noexcept -> bool;
 
-		constexpr auto ends_with(const c_str& value) const noexcept -> bool;
-		constexpr auto ends_with(const slice& value) const noexcept -> bool;
-		template<size_t N>
-		constexpr auto ends_with(const T (&value)[N]) const noexcept -> bool;
+		template<unit_t U, allo_t B>
+		constexpr auto ends_with(const c_str<U, B>/*T^T*/& value) const noexcept -> bool;
+		template<unit_t U, allo_t B>
+		constexpr auto ends_with(const c_str<U, B>::slice& value) const noexcept -> bool;
+		template<unit_t U, size_t N>
+		constexpr auto ends_with(const U/*{literal}*/(&value)[N]) const noexcept -> bool;
 
-		constexpr auto contains(const c_str& value) const noexcept -> bool;
-		constexpr auto contains(const slice& value) const noexcept -> bool;
-		template<size_t N>
-		constexpr auto contains(const T (&value)[N]) const noexcept -> bool;
+		template<unit_t U, allo_t B>
+		constexpr auto contains(const c_str<U, B>/*T^T*/& value) const noexcept -> bool;
+		template<unit_t U, allo_t B>
+		constexpr auto contains(const c_str<U, B>::slice& value) const noexcept -> bool;
+		template<unit_t U, size_t N>
+		constexpr auto contains(const U/*{literal}*/(&value)[N]) const noexcept -> bool;
 
 		// iterator
 
@@ -232,25 +252,42 @@ class c_str
 		// read & write
 
 		constexpr auto operator[](size_t value) const noexcept -> reader;
-		constexpr auto operator[](size_t value)       noexcept -> writer;
+		constexpr auto operator[](size_t value) /*&*/ noexcept -> writer;
 
 		// range syntax
 
-		constexpr auto operator[](clamp  start, clamp  until) const noexcept -> slice;
-		constexpr auto operator[](clamp  start, range  until) const noexcept -> slice;
-		constexpr auto operator[](size_t start, clamp  until) const noexcept -> slice;
-		constexpr auto operator[](size_t start, range  until) const noexcept -> slice;
+		constexpr auto operator[](clamp start, clamp until) const noexcept -> slice;
+		constexpr auto operator[](clamp start, range until) const noexcept -> slice;
+		constexpr auto operator[](size_t start, clamp until) const noexcept -> slice;
+		constexpr auto operator[](size_t start, range until) const noexcept -> slice;
 		constexpr auto operator[](size_t start, size_t until) const noexcept -> slice;
 	};
 
-	static constexpr auto __split__(const T* head, const T* tail, const T* str_0, const T* str_N) noexcept -> std::vector<slice>;
-	static constexpr auto __match__(const T* head, const T* tail, const T* str_0, const T* str_N) noexcept -> std::vector<slice>;
-	static constexpr auto __range__(const T* head, const T* tail, clamp  start, clamp  until) noexcept -> slice;
-	static constexpr auto __range__(const T* head, const T* tail, clamp  start, range  until) noexcept -> slice;
-	static constexpr auto __range__(const T* head, const T* tail, size_t start, clamp  until) noexcept -> slice;
-	static constexpr auto __range__(const T* head, const T* tail, size_t start, range  until) noexcept -> slice;
-	static constexpr auto __range__(const T* head, const T* tail, size_t start, size_t until) noexcept -> slice;
+	static constexpr auto __size__(const T* head, const T* tail) noexcept -> size_t;
+	static constexpr auto __length__(const T* head, const T* tail) noexcept -> size_t;
+
+	template<unit_t U>
+	static constexpr auto __pqual__(c_str& impl,
+	                               const U* str_0,
+	                               const U* str_N) noexcept -> void;
+	template<unit_t U>
+	static constexpr auto __equal__(const T* lhs_0, const T* lhs_N,
+	                                const U* rhs_0, const U* rhs_N) noexcept -> bool;
+	template<unit_t U>
+	static constexpr auto __nqual__(const T* lhs_0, const T* lhs_N,
+	                                const U* rhs_0, const U* rhs_N) noexcept -> bool;
+	template<unit_t U>
+	static constexpr auto __split__(const T* head , const T* tail ,
+	                                const U* str_0, const U* str_N) noexcept -> std::vector<slice>;
+	template<unit_t U>
+	static constexpr auto __match__(const T* head , const T* tail ,
+	                                const U* str_0, const U* str_N) noexcept -> std::vector<slice>;
 	
+	static constexpr auto __range__(const T* head, const T* tail, clamp start, clamp until) noexcept -> slice;
+	static constexpr auto __range__(const T* head, const T* tail, clamp start, range until) noexcept -> slice;
+	static constexpr auto __range__(const T* head, const T* tail, size_t start, clamp until) noexcept -> slice;
+	static constexpr auto __range__(const T* head, const T* tail, size_t start, range until) noexcept -> slice;
+	static constexpr auto __range__(const T* head, const T* tail, size_t start, size_t until) noexcept -> slice;
 
 	class reader
 	{
@@ -300,7 +337,7 @@ class c_str
 		size_t meta : (sizeof(mode_t) * 8) - (sizeof(mode_t) * 0);
 
 		constexpr operator const T*() const noexcept;
-		constexpr operator       T*()       noexcept;
+		constexpr operator /*&*/ T*() /*&*/ noexcept;
 	};
 
 	static constexpr const uint8_t MAX {(sizeof(buffer) - 1) / (sizeof(T))};
@@ -345,18 +382,18 @@ class c_str
 		// single source of truth; category.
 		constexpr auto mode() const noexcept -> mode_t;
 		// single source of truth; category.
-		constexpr auto mode()       noexcept -> mode_t;
+		constexpr auto mode() /*&*/ noexcept -> mode_t;
 	};
 
 	// returns ptr to the first element.
 	constexpr auto head() const noexcept -> const T*;
 	// returns ptr to the first element.
-	constexpr auto head()       noexcept ->       T*;
+	constexpr auto head() /*&*/ noexcept -> /*&*/ T*;
 
 	// returns ptr to the one-past-the-last element.
 	constexpr auto tail() const noexcept -> const T*;
 	// returns ptr to the one-past-the-last element.
-	constexpr auto tail()       noexcept ->       T*;
+	constexpr auto tail() /*&*/ noexcept -> /*&*/ T*;
 	// fixes invariant; use it after internal manipulation.
 	constexpr auto __size__(size_t value) noexcept -> void;
 
@@ -374,62 +411,53 @@ class c_str
 
 public:
 
-	class codec
+	// optional; returns the content of a file with CRLF/CR to LF normalization.
+	template<typename STRING> friend auto fileof(const STRING& path) noexcept
+	->
+	std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
+
+	template<unit_t U, allo_t B>
+	// only allow conversion for utf-N
+	requires (!std::is_same_v<T, char>
+	          &&
+	          !std::is_same_v<U, char>)
+	// re-encode content into diff format.
+	operator c_str<U, B>() const noexcept;
+	// re-encode content into std::string.
+	operator std::string() const noexcept;
+
+	struct codec
 	{
-		// nothing to do...
-
-	public:
-
 		codec() = delete;
 
 		static constexpr auto size(char32_t code) noexcept -> int8_t;
-		static constexpr auto next(const T* ptr) noexcept -> int8_t;
-		static constexpr auto back(const T* ptr) noexcept -> int8_t;
+		static constexpr auto next(const T* ptr ) noexcept -> int8_t;
+		static constexpr auto back(const T* ptr ) noexcept -> int8_t;
 		static constexpr auto encode_ptr(const char32_t in, T* out, int8_t size) noexcept -> void;
 		static constexpr auto decode_ptr(const T* in, char32_t& out, int8_t size) noexcept -> void;
 	};
-
-	// returns the content of a file with CR or CRLF to LF normalization.
-	template<class S> friend auto fileof(const S& path) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
-	// returns the content of a file with CR or CRLF to LF normalization.
-	template<size_t N> friend auto fileof(const char (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
-	// returns the content of a file with CR or CRLF to LF normalization.
-	template<size_t N> friend auto fileof(const char8_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
-	// returns the content of a file with CR or CRLF to LF normalization.
-	template<size_t N> friend auto fileof(const char16_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
-	// returns the content of a file with CR or CRLF to LF normalization.
-	template<size_t N> friend auto fileof(const char32_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>;
-
-	// convertion
-
-	template<class U, class X> requires
-	(
-		!std::is_same_v<T, char>
-		&&
-		!std::is_same_v<U, char>
-	)
-	operator c_str<U, X>() const noexcept;
-	operator std::string() const noexcept;
-
-	// constructor
 
 	constexpr c_str(/* empty string */) noexcept
 	{
 		// nothing to do...
 	}
 
-	template<size_t N>
-	constexpr c_str(const T (&other)[N]) noexcept
+	template<unit_t U, allo_t B>
+	constexpr c_str(const c_str<U, B>/*T^T*/& rhs) noexcept
 	{
-		this->capacity(N - 1);
+		__pqual__(*this, rhs.head(), rhs.tail());
+	}
+	
+	template<unit_t U, allo_t B>
+	constexpr c_str(const c_str<U, B>::slice& rhs) noexcept
+	{
+		__pqual__(*this, rhs.head, rhs.tail);
+	}
 
-		std::ranges::copy
-		(
-			&other[0 - 0],
-			&other[N - 1],
-			this->head()
-		);
-		this->__size__(N - 1);
+	template<unit_t U, size_t N>
+	constexpr c_str(const U/*{literal}*/(&rhs)[N]) noexcept
+	{
+		__pqual__(*this, &rhs[0x0], &rhs[N-1]);
 	}
 
 	// rule of 5
@@ -495,38 +523,48 @@ public:
 	// returns the number of code units it can hold, excluding NULL-TERMINATOR.
 	constexpr auto capacity(/* getter */) const noexcept -> size_t;
 	// changes the number of code units it can hold, excluding NULL-TERMINATOR.
-	constexpr auto capacity(size_t value)       noexcept -> void;
+	constexpr auto capacity(size_t value) /*&*/ noexcept -> void;
 
-	// returns a list of string slice, of which are product of what remains after a split.
-	constexpr auto split(const c_str& value) const noexcept -> std::vector<slice>;
-	// returns a list of string slice, of which are product of what remains after a split.
-	constexpr auto split(const slice& value) const noexcept -> std::vector<slice>;
-	// returns a list of string slice, of which are product of what remains after a split.
-	template<size_t N>
-	constexpr auto split(const T (&value)[N]) const noexcept -> std::vector<slice>;
+	// returns a list of string slice, of which are product of split (division).
+	template<unit_t U, allo_t B>
+	constexpr auto split(const c_str<U, B>/*T^T*/& value) const noexcept -> std::vector<slice>;
+	// returns a list of string slice, of which are product of split (division).
+	template<unit_t U, allo_t B>
+	constexpr auto split(const c_str<U, B>::slice& value) const noexcept -> std::vector<slice>;
+	// returns a list of string slice, of which are product of split (division).
+	template<unit_t U, size_t N>
+	constexpr auto split(const U/*{literal}*/(&value)[N]) const noexcept -> std::vector<slice>;
 
 	// returns a list of string slice, of which are product of search occurrence.
-	constexpr auto match(const c_str& value) const noexcept -> std::vector<slice>;
+	template<unit_t U, allo_t B>
+	constexpr auto match(const c_str<U, B>/*T^T*/& value) const noexcept -> std::vector<slice>;
 	// returns a list of string slice, of which are product of search occurrence.
-	constexpr auto match(const slice& value) const noexcept -> std::vector<slice>;
+	template<unit_t U, allo_t B>
+	constexpr auto match(const c_str<U, B>::slice& value) const noexcept -> std::vector<slice>;
 	// returns a list of string slice, of which are product of search occurrence.
-	template<size_t N>
-	constexpr auto match(const T (&value)[N]) const noexcept -> std::vector<slice>;
+	template<unit_t U, size_t N>
+	constexpr auto match(const U/*{literal}*/(&value)[N]) const noexcept -> std::vector<slice>;
 
-	constexpr auto starts_with(const c_str& value) const noexcept -> bool;
-	constexpr auto starts_with(const slice& value) const noexcept -> bool;
-	template<size_t N>
-	constexpr auto starts_with(const T (&value)[N]) const noexcept -> bool;
+	template<unit_t U, allo_t B>
+	constexpr auto starts_with(const c_str<U, B>/*T^T*/& value) const noexcept -> bool;
+	template<unit_t U, allo_t B>
+	constexpr auto starts_with(const c_str<U, B>::slice& value) const noexcept -> bool;
+	template<unit_t U, size_t N>
+	constexpr auto starts_with(const U/*{literal}*/(&value)[N]) const noexcept -> bool;
 
-	constexpr auto ends_with(const c_str& value) const noexcept -> bool;
-	constexpr auto ends_with(const slice& value) const noexcept -> bool;
-	template<size_t N>
-	constexpr auto ends_with(const T (&value)[N]) const noexcept -> bool;
+	template<unit_t U, allo_t B>
+	constexpr auto ends_with(const c_str<U, B>/*T^T*/& value) const noexcept -> bool;
+	template<unit_t U, allo_t B>
+	constexpr auto ends_with(const c_str<U, B>::slice& value) const noexcept -> bool;
+	template<unit_t U, size_t N>
+	constexpr auto ends_with(const U/*{literal}*/(&value)[N]) const noexcept -> bool;
 
-	constexpr auto contains(const c_str& value) const noexcept -> bool;
-	constexpr auto contains(const slice& value) const noexcept -> bool;
-	template<size_t N>
-	constexpr auto contains(const T (&value)[N]) const noexcept -> bool;
+	template<unit_t U, allo_t B>
+	constexpr auto contains(const c_str<U, B>/*T^T*/& value) const noexcept -> bool;
+	template<unit_t U, allo_t B>
+	constexpr auto contains(const c_str<U, B>::slice& value) const noexcept -> bool;
+	template<unit_t U, size_t N>
+	constexpr auto contains(const U/*{literal}*/(&value)[N]) const noexcept -> bool;
 
 	// iterator
 
@@ -536,14 +574,14 @@ public:
 	// read & write
 
 	constexpr auto operator[](size_t value) const noexcept -> reader;
-	constexpr auto operator[](size_t value)       noexcept -> writer;
+	constexpr auto operator[](size_t value) /*&*/ noexcept -> writer;
 
 	// range syntax
 
-	constexpr auto operator[](clamp  start, clamp  until) const noexcept -> slice;
-	constexpr auto operator[](clamp  start, range  until) const noexcept -> slice;
-	constexpr auto operator[](size_t start, clamp  until) const noexcept -> slice;
-	constexpr auto operator[](size_t start, range  until) const noexcept -> slice;
+	constexpr auto operator[](clamp start, clamp until) const noexcept -> slice;
+	constexpr auto operator[](clamp start, range until) const noexcept -> slice;
+	constexpr auto operator[](size_t start, clamp until) const noexcept -> slice;
+	constexpr auto operator[](size_t start, range until) const noexcept -> slice;
 	constexpr auto operator[](size_t start, size_t until) const noexcept -> slice;
 
 	// iostream
@@ -558,72 +596,68 @@ public:
 		for (const auto code : str) { os << code; } return os;
 	}
 
-	// A += B
+	// A = B
 
-	friend constexpr auto operator+=(c_str& lhs, const c_str& rhs) noexcept -> c_str&
+	template<unit_t U, allo_t B>
+	constexpr auto operator=(const c_str<U, B>/*T^T*/& rhs) noexcept -> c_str&
 	{
-		const auto size {lhs.size() + rhs.size()};
+		this->__size__(0); assert(this->head() == this->tail());
 
-		if (0 < rhs.size())
-		{
-			lhs.capacity(size);
-
-			// overrides '\0'
-			std::ranges::copy
-			(
-				rhs.head(),
-				rhs.tail(),
-				lhs.tail()
-			);
-			lhs.__size__(size);
-		}
-		return lhs;
+		__pqual__(*this, rhs.head(), rhs.tail());
+		
+		return *this;
 	}
 	
-	friend constexpr auto operator+=(c_str& lhs, const slice& rhs) noexcept -> c_str&
+	template<unit_t U, allo_t B>
+	constexpr auto operator=(const c_str<U, B>::slice& rhs) noexcept -> c_str&
 	{
-		const auto size {lhs.size() + rhs.size()};
+		this->__size__(0); assert(this->head() == this->tail());
 
-		if (0 < rhs.size())
-		{
-			lhs.capacity(size);
-
-			// overrides '\0'
-			std::ranges::copy
-			(
-				rhs.head,
-				rhs.tail,
-				lhs.tail()
-			);
-			lhs.__size__(size);
-		}
-		return lhs;
+		__pqual__(*this, rhs.head, rhs.tail);
+		
+		return *this;
 	}
 
-	template<size_t N>
-	friend constexpr auto operator+=(c_str& lhs, const T (&rhs)[N]) noexcept -> c_str&
+	template<unit_t U, size_t N>
+	constexpr auto operator=(const U/*{literal}*/(&rhs)[N]) noexcept -> c_str&
 	{
-		const auto size {lhs.size() + N - 1};
+		this->__size__(0); assert(this->head() == this->tail());
 
-		if (0 < N - 1)
-		{
-			lhs.capacity(size);
+		__pqual__(*this, &rhs[0x0], &rhs[N-1]);
 
-			// overrides '\0'
-			std::ranges::copy
-			(
-				&rhs[0 - 0],
-				&rhs[N - 1],
-				lhs.tail()
-			);
-			lhs.__size__(size);
-		}
-		return lhs;
+		return *this;
+	}
+
+	// A += B
+
+	template<unit_t U, allo_t B>
+	constexpr auto operator+=(const c_str<U, B>/*T^T*/& rhs) noexcept -> c_str&
+	{
+		__pqual__(*this, rhs.head(), rhs.tail());
+
+		return *this;
+	}
+	
+	template<unit_t U, allo_t B>
+	constexpr auto operator+=(const c_str<U, B>::slice& rhs) noexcept -> c_str&
+	{
+		__pqual__(*this, rhs.head, rhs.tail);
+
+		return *this;
+	}
+
+	template<unit_t U, size_t N>
+	constexpr auto operator+=(const U/*{literal}*/(&rhs)[N]) noexcept -> c_str&
+	{
+		__pqual__(*this, &rhs[0x0], &rhs[N-1]);
+
+		return *this;
 	}
 
 	// A + B
 
-	friend constexpr auto operator+(const c_str& lhs, const c_str& rhs) noexcept -> c_str
+	template<unit_t U, allo_t B>
+	friend constexpr auto operator+(const c_str& lhs, const c_str<U, B>/*T^T*/& rhs) noexcept -> c_str
 	{
 		c_str str;
 
@@ -633,17 +667,8 @@ public:
 		return str;
 	}
 
-	friend constexpr auto operator+(const slice& lhs, const slice& rhs) noexcept -> c_str
-	{
-		c_str str;
-
-		str += lhs;
-		str += rhs;
-
-		return str;
-	}
-	
-	friend constexpr auto operator+(const c_str& lhs, const slice& rhs) noexcept -> c_str
+	template<unit_t U, allo_t B>
+	friend constexpr auto operator+(const slice& lhs, const c_str<U, B>::slice& rhs) noexcept -> c_str
 	{
 		c_str str;
 
@@ -653,7 +678,8 @@ public:
 		return str;
 	}
 
-	friend constexpr auto operator+(const slice& lhs, const c_str& rhs) noexcept -> c_str
+	template<unit_t U, allo_t B>
+	friend constexpr auto operator+(const c_str& lhs, const c_str<U, B>::slice& rhs) noexcept -> c_str
 	{
 		c_str str;
 
@@ -663,8 +689,8 @@ public:
 		return str;
 	}
 
-	template<size_t N>
-	friend constexpr auto operator+(const c_str& lhs, const T (&rhs)[N]) noexcept -> c_str
+	template<unit_t U, allo_t B>
+	friend constexpr auto operator+(const slice& lhs, const c_str<U, B>/*T^T*/& rhs) noexcept -> c_str
 	{
 		c_str str;
 
@@ -674,8 +700,8 @@ public:
 		return str;
 	}
 
-	template<size_t N>
-	friend constexpr auto operator+(const T (&lhs)[N], const c_str& rhs) noexcept -> c_str
+	template<unit_t U, size_t N>
+	friend constexpr auto operator+(const c_str& lhs, const U/*{literal}*/(&rhs)[N]) noexcept -> c_str
 	{
 		c_str str;
 
@@ -685,8 +711,8 @@ public:
 		return str;
 	}
 
-	template<size_t N>
-	friend constexpr auto operator+(const slice& lhs, const T (&rhs)[N]) noexcept -> c_str
+	template<unit_t U, size_t N>
+	friend constexpr auto operator+(const U/*{literal}*/(&lhs)[N], const c_str& rhs) noexcept -> c_str
 	{
 		c_str str;
 
@@ -696,8 +722,19 @@ public:
 		return str;
 	}
 
-	template<size_t N>
-	friend constexpr auto operator+(const T (&lhs)[N], const slice& rhs) noexcept -> c_str
+	template<unit_t U, size_t N>
+	friend constexpr auto operator+(const slice& lhs, const U/*{literal}*/(&rhs)[N]) noexcept -> c_str
+	{
+		c_str str;
+
+		str += lhs;
+		str += rhs;
+
+		return str;
+	}
+
+	template<unit_t U, size_t N>
+	friend constexpr auto operator+(const U/*{literal}*/(&lhs)[N], const slice& rhs) noexcept -> c_str
 	{
 		c_str str;
 
@@ -709,303 +746,611 @@ public:
 
 	// A == B
 
-	friend constexpr auto operator==(const c_str& lhs, const c_str& rhs) noexcept -> bool
+	template<unit_t U, allo_t B>
+	friend constexpr auto operator==(const c_str& lhs, const c_str<U, B>/*T^T*/& rhs) noexcept -> bool
 	{
-		const auto* lhs_0 {lhs.head()}; const auto* rhs_0 {rhs.head()};
-		const auto* lhs_N {lhs.tail()}; const auto* rhs_N {rhs.tail()};
+		const T* lhs_0 {lhs.head()}; const U* rhs_0 {rhs.head()};
+		const T* lhs_N {lhs.tail()}; const U* rhs_N {rhs.tail()};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return &lhs == &rhs || (lhs.size() == rhs.size() && std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N));
+		return &lhs == &rhs || __equal__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 
-	friend constexpr auto operator==(const slice& lhs, const slice& rhs) noexcept -> bool
+	template<unit_t U, allo_t B>
+	friend constexpr auto operator==(const slice& lhs, const c_str<U, B>::slice& rhs) noexcept -> bool
 	{
-		const auto* lhs_0 {lhs.head}; const auto* rhs_0 {rhs.head};
-		const auto* lhs_N {lhs.tail}; const auto* rhs_N {rhs.tail};
+		const T* lhs_0 {lhs.head}; const U* rhs_0 {rhs.head};
+		const T* lhs_N {lhs.tail}; const U* rhs_N {rhs.tail};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return &lhs == &rhs || (lhs.size() == rhs.size() && std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N));
+		return &lhs == &rhs || __equal__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 	
-	friend constexpr auto operator==(const c_str& lhs, const slice& rhs) noexcept -> bool
+	template<unit_t U, allo_t B>
+	friend constexpr auto operator==(const c_str& lhs, const c_str<U, B>::slice& rhs) noexcept -> bool
 	{
-		const auto* lhs_0 {lhs.head()}; const auto* rhs_0 {rhs.head};
-		const auto* lhs_N {lhs.tail()}; const auto* rhs_N {rhs.tail};
+		const T* lhs_0 {lhs.head()}; const U* rhs_0 {rhs.head};
+		const T* lhs_N {lhs.tail()}; const U* rhs_N {rhs.tail};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return lhs.size() == rhs.size() && std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+		return __equal__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 
-	friend constexpr auto operator==(const slice& lhs, const c_str& rhs) noexcept -> bool
+	template<unit_t U, allo_t B>
+	friend constexpr auto operator==(const slice& lhs, const c_str<U, B>/*T^T*/& rhs) noexcept -> bool
 	{
-		const auto* lhs_0 {lhs.head}; const auto* rhs_0 {rhs.head()};
-		const auto* lhs_N {lhs.tail}; const auto* rhs_N {rhs.tail()};
+		const T* lhs_0 {lhs.head}; const U* rhs_0 {rhs.head()};
+		const T* lhs_N {lhs.tail}; const U* rhs_N {rhs.tail()};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return lhs.size() == rhs.size() && std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+		return __equal__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 
-	template<size_t N>
-	friend constexpr auto operator==(const c_str& lhs, const T (&rhs)[N]) noexcept -> bool
+	template<unit_t U, size_t N>
+	friend constexpr auto operator==(const c_str& lhs, const U/*{literal}*/(&rhs)[N]) noexcept -> bool
 	{
-		const auto* lhs_0 {lhs.head()}; const auto* rhs_0 {&rhs[0 - 0]};
-		const auto* lhs_N {lhs.tail()}; const auto* rhs_N {&rhs[N - 1]};
+		const T* lhs_0 {lhs.head()}; const U* rhs_0 {&rhs[0x0]};
+		const T* lhs_N {lhs.tail()}; const U* rhs_N {&rhs[N-1]};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return lhs.size() == N - 1 && std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+		return __equal__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 
-	template<size_t N>
-	friend constexpr auto operator==(const T (&lhs)[N], const c_str& rhs) noexcept -> bool
+	template<unit_t U, size_t N>
+	friend constexpr auto operator==(const U/*{literal}*/(&lhs)[N], const c_str& rhs) noexcept -> bool
 	{
-		const auto* lhs_0 {&lhs[0 - 0]}; const auto* rhs_0 {rhs.head()};
-		const auto* lhs_N {&lhs[N - 1]}; const auto* rhs_N {rhs.tail()};
+		const T* lhs_0 {&lhs[0x0]}; const U* rhs_0 {rhs.head()};
+		const T* lhs_N {&lhs[N-1]}; const U* rhs_N {rhs.tail()};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return N - 1 == rhs.size() && std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+		return __equal__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 
-	template<size_t N>
-	friend constexpr auto operator==(const slice& lhs, const T (&rhs)[N]) noexcept -> bool
+	template<unit_t U, size_t N>
+	friend constexpr auto operator==(const slice& lhs, const U/*{literal}*/(&rhs)[N]) noexcept -> bool
 	{
-		const auto* lhs_0 {lhs.head}; const auto* rhs_0 {&rhs[0 - 0]};
-		const auto* lhs_N {lhs.tail}; const auto* rhs_N {&rhs[N - 1]};
+		const T* lhs_0 {lhs.head}; const U* rhs_0 {&rhs[0x0]};
+		const T* lhs_N {lhs.tail}; const U* rhs_N {&rhs[N-1]};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return lhs.size() == N - 1 && std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+		return __equal__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 
-	template<size_t N>
-	friend constexpr auto operator==(const T (&lhs)[N], const slice& rhs) noexcept -> bool
+	template<unit_t U, size_t N>
+	friend constexpr auto operator==(const U/*{literal}*/(&lhs)[N], const slice& rhs) noexcept -> bool
 	{
-		const auto* lhs_0 {&lhs[0 - 0]}; const auto* rhs_0 {rhs.head};
-		const auto* lhs_N {&lhs[N - 1]}; const auto* rhs_N {rhs.tail};
+		const T* lhs_0 {&lhs[0x0]}; const U* rhs_0 {rhs.head};
+		const T* lhs_N {&lhs[N-1]}; const U* rhs_N {rhs.tail};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return N - 1 == rhs.size() && std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+		return __equal__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 
 	// A != B
 
-	friend constexpr auto operator!=(const c_str& lhs, const c_str& rhs) noexcept -> bool
+	template<unit_t U, allo_t B>
+	friend constexpr auto operator!=(const c_str& lhs, const c_str<U, B>/*T^T*/& rhs) noexcept -> bool
 	{
-		const auto* lhs_0 {lhs.head()}; const auto* rhs_0 {rhs.head()};
-		const auto* lhs_N {lhs.tail()}; const auto* rhs_N {rhs.tail()};
+		const T* lhs_0 {lhs.head()}; const U* rhs_0 {rhs.head()};
+		const T* lhs_N {lhs.tail()}; const U* rhs_N {rhs.tail()};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return &lhs != &rhs && (lhs.size() != rhs.size() || !std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N));
+		return &lhs != &rhs && __nqual__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 
-	friend constexpr auto operator!=(const slice& lhs, const slice& rhs) noexcept -> bool
+	template<unit_t U, allo_t B>
+	friend constexpr auto operator!=(const slice& lhs, const c_str<U, B>::slice& rhs) noexcept -> bool
 	{
-		const auto* lhs_0 {lhs.head}; const auto* rhs_0 {rhs.head};
-		const auto* lhs_N {lhs.tail}; const auto* rhs_N {rhs.tail};
+		const T* lhs_0 {lhs.head}; const U* rhs_0 {rhs.head};
+		const T* lhs_N {lhs.tail}; const U* rhs_N {rhs.tail};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return &lhs != &rhs && (lhs.size() != rhs.size() || !std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N));
+		return &lhs != &rhs && __nqual__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 	
-	friend constexpr auto operator!=(const c_str& lhs, const slice& rhs) noexcept -> bool
+	template<unit_t U, allo_t B>
+	friend constexpr auto operator!=(const c_str& lhs, const c_str<U, B>::slice& rhs) noexcept -> bool
 	{
-		const auto* lhs_0 {lhs.head()}; const auto* rhs_0 {rhs.head};
-		const auto* lhs_N {lhs.tail()}; const auto* rhs_N {rhs.tail};
+		const T* lhs_0 {lhs.head()}; const U* rhs_0 {rhs.head};
+		const T* lhs_N {lhs.tail()}; const U* rhs_N {rhs.tail};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return lhs.size() != rhs.size() || !std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+		return __nqual__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 
-	friend constexpr auto operator!=(const slice& lhs, const c_str& rhs) noexcept -> bool
+	template<unit_t U, allo_t B>
+	friend constexpr auto operator!=(const slice& lhs, const c_str<U, B>/*T^T*/& rhs) noexcept -> bool
 	{
-		const auto* lhs_0 {lhs.head}; const auto* rhs_0 {rhs.head()};
-		const auto* lhs_N {lhs.tail}; const auto* rhs_N {rhs.tail()};
+		const T* lhs_0 {lhs.head}; const U* rhs_0 {rhs.head()};
+		const T* lhs_N {lhs.tail}; const U* rhs_N {rhs.tail()};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return lhs.size() != rhs.size() || !std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+		return __nqual__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 
-	template<size_t N>
-	friend constexpr auto operator!=(const c_str& lhs, const T (&rhs)[N]) noexcept -> bool
+	template<unit_t U, size_t N>
+	friend constexpr auto operator!=(const c_str& lhs, const U/*{literal}*/(&rhs)[N]) noexcept -> bool
 	{
-		const auto* lhs_0 {lhs.head()}; const auto* rhs_0 {&rhs[0 - 0]};
-		const auto* lhs_N {lhs.tail()}; const auto* rhs_N {&rhs[N - 1]};
+		const T* lhs_0 {lhs.head()}; const U* rhs_0 {&rhs[0x0]};
+		const T* lhs_N {lhs.tail()}; const U* rhs_N {&rhs[N-1]};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return lhs.size() != N - 1 || !std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+		return __nqual__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 
-	template<size_t N>
-	friend constexpr auto operator!=(const T (&lhs)[N], const c_str& rhs) noexcept -> bool
+	template<unit_t U, size_t N>
+	friend constexpr auto operator!=(const U/*{literal}*/(&lhs)[N], const c_str& rhs) noexcept -> bool
 	{
-		const auto* lhs_0 {&lhs[0 - 0]}; const auto* rhs_0 {rhs.head()};
-		const auto* lhs_N {&lhs[N - 1]}; const auto* rhs_N {rhs.tail()};
+		const T* lhs_0 {&lhs[0x0]}; const U* rhs_0 {rhs.head()};
+		const T* lhs_N {&lhs[N-1]}; const U* rhs_N {rhs.tail()};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return N - 1 != rhs.size() || !std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+		return __nqual__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 
-	template<size_t N>
-	friend constexpr auto operator!=(const slice& lhs, const T (&rhs)[N]) noexcept -> bool
+	template<unit_t U, size_t N>
+	friend constexpr auto operator!=(const slice& lhs, const U/*{literal}*/(&rhs)[N]) noexcept -> bool
 	{
-		const auto* lhs_0 {lhs.head}; const auto* rhs_0 {&rhs[0 - 0]};
-		const auto* lhs_N {lhs.tail}; const auto* rhs_N {&rhs[N - 1]};
+		const T* lhs_0 {lhs.head}; const U* rhs_0 {&rhs[0x0]};
+		const T* lhs_N {lhs.tail}; const U* rhs_N {&rhs[N-1]};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return lhs.size() != N - 1 || !std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+		return __nqual__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 
-	template<size_t N>
-	friend constexpr auto operator!=(const T (&lhs)[N], const slice& rhs) noexcept -> bool
+	template<unit_t U, size_t N>
+	friend constexpr auto operator!=(const U/*{literal}*/(&lhs)[N], const slice& rhs) noexcept -> bool
 	{
-		const auto* lhs_0 {&lhs[0 - 0]}; const auto* rhs_0 {rhs.head};
-		const auto* lhs_N {&lhs[N - 1]}; const auto* rhs_N {rhs.tail};
+		const T* lhs_0 {&lhs[0x0]}; const U* rhs_0 {rhs.head};
+		const T* lhs_N {&lhs[N-1]}; const U* rhs_N {rhs.tail};
 
-		// assert(lhs_N - lhs_0 == rhs_N - rhs_0);
-
-		return N - 1 != rhs.size() || !std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+		return __nqual__(lhs_0, lhs_N, rhs_0, rhs_N);
 	}
 };
 
-#define IMPL                    \
-                                \
-template                        \
-<                               \
-    class T,                    \
-    class A                     \
->                               \
-requires                        \
-(                               \
-    std::is_same_v<T, char>     \
-    ||                          \
-    std::is_same_v<T, char8_t>  \
-    ||                          \
-    std::is_same_v<T, char16_t> \
-    ||                          \
-    std::is_same_v<T, char32_t> \
-)                               \
+// https://en.wikipedia.org/wiki/UTF-8
+typedef c_str<char8_t> utf8;
+// https://en.wikipedia.org/wiki/UTF-16
+typedef c_str<char16_t> utf16;
+// https://en.wikipedia.org/wiki/UTF-32
+typedef c_str<char32_t> utf32;
 
-IMPL template<class U, class X> requires (!std::is_same_v<T, char> && !std::is_same_v<U, char>) c_str<T, A>::operator c_str<U, X>() const noexcept
+#pragma region core
+
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+requires (!std::is_same_v<T, char>
+          &&
+          !std::is_same_v<U, char>)
+
+c_str<T, A>::operator c_str<U, B>() const noexcept
 {
-	c_str<U, X> str;
+	c_str<U, B> str;
 	
 	if (0 < this->size())
 	{
-		const auto size {[&](){ size_t impl {0}; for (const auto code : *this) { impl += c_str<U, X>::codec::size(code); } return impl; }()};
-
-		str.capacity(size);
-		str.__size__(size);
-
-		auto* ptr {reinterpret_cast<U*>(str.head())};
-
-		for (const auto code : *this)
+		size_t XXX {0};
+		
+		const T* foo {this->head()};
+		const T* bar {this->tail()};
+		
+		for (/* walk through ptr, from head to tail */; foo < bar;)
 		{
-			const auto size {c_str<U, X>::codec::size(code)};
-			c_str<U, X>::codec::encode_ptr(code, ptr, size);
-			ptr += size;
+			char32_t out;
+
+			const auto T_size {c_str<T>::codec::next(foo)};
+			c_str<T>::codec::decode_ptr(foo, out, T_size);
+			const auto U_size {c_str<U>::codec::size(out)};
+
+			foo += T_size;
+			XXX += U_size;
+		}
+
+		str.capacity(XXX);
+		str.__size__(XXX);
+		// reset to init
+		foo = this->head();
+
+		for (U* ptr {reinterpret_cast<U*>(str.head())}; foo < bar;)
+		{
+			char32_t out;
+
+			const auto T_size {c_str<T>::codec::next(foo)};
+			c_str<T>::codec::decode_ptr(foo, out, T_size);
+			const auto U_size {c_str<U>::codec::size(out)};
+			c_str<U>::codec::encode_ptr(out, ptr, U_size);
+
+			foo += T_size;
+			ptr += U_size;
 		}
 	}
 	return str;
 }
 
-IMPL /* backward compatibility. unfortunately, this requires re-encoding, from head to tail. */ c_str<T, A>::operator std::string() const noexcept
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+c_str<T, A>::operator std::string() const noexcept
 {
+	typedef char8_t U;
+
 	std::string str;
 
 	if (0 < this->size())
 	{
-		const auto size {[&](){ size_t impl {0}; for (const auto code : *this) { impl += c_str<char8_t>::codec::size(code); } return impl; }()};
-	
-		str.reserve(size);
-		str.resize(size);
+		size_t XXX {0};
 
-		auto* ptr {reinterpret_cast<char8_t*>(str.data())};
+		const T* foo {this->head()};
+		const T* bar {this->tail()};
 
-		for (const auto code : *this)
+		for (/* walk through ptr, from head to tail */; foo < bar;)
 		{
-			const auto size {c_str<char8_t>::codec::size(code)};
-			c_str<char8_t>::codec::encode_ptr(code, ptr, size);
-			ptr += size;
+			char32_t out;
+
+			const auto T_size {c_str<T>::codec::next(foo)};
+			c_str<T>::codec::decode_ptr(foo, out, T_size);
+			const auto U_size {c_str<U>::codec::size(out)};
+
+			foo += T_size;
+			XXX += U_size;
+		}
+
+		str.resize(XXX);
+		// reset to init
+		foo = this->head();
+
+		for (U* ptr {reinterpret_cast<U*>(str.data())}; foo < bar;)
+		{
+			char32_t out;
+
+			const auto T_size {c_str<T>::codec::next(foo)};
+			c_str<T>::codec::decode_ptr(foo, out, T_size);
+			const auto U_size {c_str<U>::codec::size(out)};
+			c_str<U>::codec::encode_ptr(out, ptr, U_size);
+
+			foo += T_size;
+			ptr += U_size;
 		}
 	}
 	return str;
 }
 
-IMPL constexpr auto c_str<T, A>::__split__(const T* head, const T* tail, const T* str_0, const T* str_N) noexcept -> std::vector<slice>
-{	
-	const auto delta {str_N - str_0};
-	
-	std::vector<slice> out;
-
-	auto* foo {head};
-	auto* bar {head};
-
-	for (; bar + delta < tail; ++bar)
-	{
-		size_t i {0};
-
-		for (; i < delta; ++i)
-		{
-			if (bar[i] != str_0[i]) { break; }
-		}
-		if (i == delta)
-		{
-			// ...identical portion
-			out.emplace_back(&foo[0], &bar[0]);
-
-			foo = bar + delta;
-			bar = bar + delta;
-		}
-	}
-	if (foo < tail)
-	{
-		// ...remaining portion
-		out.emplace_back(foo, tail);
-	}
-	return out;
-}
-
-IMPL constexpr auto c_str<T, A>::__match__(const T* head, const T* tail, const T* str_0, const T* str_N) noexcept -> std::vector<slice>
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::__size__(const T* head, const T* tail) noexcept -> size_t
 {
-	const auto delta {str_N - str_0};
-	
-	std::vector<slice> out;
+	//|--------------------|
+	//| Roses are red      |
+	//|   Violets are blue |
+	//| Sugar is sweet     |
+	//|   & So are you :D  |
+	//|--------------------|
 
-	auto* foo {head};
+	assert(head <= tail);
+	return tail - head;
+}
 
-	for (; foo + delta < tail; ++foo)
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::__length__(const T* head, const T* tail) noexcept -> size_t
+{
+	if constexpr (std::is_same_v<T, char>)
 	{
-		size_t i {0};
-
-		for (; i < delta; ++i)
-		{
-			if (foo[i] != str_0[i]) { break; }
-		}
-		if (i == delta)
-		{
-			// ...identical portion
-			out.emplace_back(&foo[0], &foo[i]);
-
-			foo += delta;
-		}
+		return __size__(head, tail);
 	}
+
+	if constexpr (std::is_same_v<T, char32_t>)
+	{
+		return __size__(head, tail);
+	}
+
+	size_t out {0};
+	
+	for (const T* foo {head}; foo < tail; ++out, foo += codec::next(foo)) {}
+	
 	return out;
 }
 
-IMPL constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, clamp  start, clamp  until) noexcept -> slice
+template<unit_t T, allo_t A>
+template<unit_t U          >
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::__pqual__(c_str& impl,
+                                     const U* str_0,
+                                     const U* str_N) noexcept -> void
+{
+	if constexpr (!std::is_same_v<T, U>)
+	{
+		if (0 < str_N - str_0)
+		{
+			size_t XXX {0};
+
+			for (const U* foo {str_0}; foo < str_N;)
+			{
+				char32_t out;
+
+				const auto U_size {c_str<U>::codec::next(foo)};
+				c_str<U>::codec::decode_ptr(foo, out, U_size);
+				const auto T_size {c_str<T>::codec::size(out)};
+
+				foo += U_size;
+				XXX += T_size;
+			}
+
+			// fix overflow
+			impl.capacity(XXX);
+
+			T* ptr {impl.tail()};
+
+			// overrides '\0'
+			for (const U* foo {str_0}; foo < str_N;)
+			{
+				char32_t out;
+
+				const auto U_size {c_str<U>::codec::next(foo)};
+				c_str<U>::codec::decode_ptr(foo, out, U_size);
+				const auto T_size {c_str<T>::codec::size(out)};
+				c_str<T>::codec::encode_ptr(out, ptr, T_size);
+
+				foo += U_size;
+				ptr += T_size;
+			}
+			// fix invariant
+			impl.__size__(XXX);
+		}
+	}
+	else
+	{
+		if (0 < str_N - str_0)
+		{
+			const auto XXX//{(@LHS_SIZE@RHS_SIZE)};
+			{impl.size() + __size__(str_0, str_N)};
+
+			// fix overflow
+			impl.capacity(XXX);
+
+			// overrides '\0'
+			std::ranges::copy
+			(
+				str_0,
+				str_N,
+				impl.tail()
+			);
+			// fix invariant
+			impl.__size__(XXX);
+		}
+	}
+}
+
+template<unit_t T, allo_t A>
+template<unit_t U          >
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::__equal__(const T* lhs_0, const T* lhs_N,
+                                      const U* rhs_0, const U* rhs_N) noexcept -> bool
+{
+	if constexpr (!std::is_same_v<T, U>)
+	{
+		const T* foo {lhs_0};
+		const U* bar {rhs_0};
+
+		for (; foo < lhs_N && bar < rhs_N;)
+		{
+			char32_t T_out;
+			char32_t U_out;
+
+			const auto T_size {c_str<T>::codec::next(foo)};
+			const auto U_size {c_str<U>::codec::next(bar)};
+
+			c_str<T>::codec::decode_ptr(foo, T_out, T_size);
+			c_str<U>::codec::decode_ptr(bar, U_out, U_size);
+
+			if (T_out != U_out)
+			{
+				return false;
+			}
+			foo += T_size;
+			bar += U_size;
+		}
+		return true;
+	}
+	else
+	{
+		return __size__(lhs_0, lhs_N) == __size__(rhs_0, rhs_N)
+		       &&
+		       std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+	}
+}
+
+template<unit_t T, allo_t A>
+template<unit_t U          >
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::__nqual__(const T* lhs_0, const T* lhs_N,
+                                      const U* rhs_0, const U* rhs_N) noexcept -> bool
+{
+	if constexpr (!std::is_same_v<T, U>)
+	{
+		const T* foo {lhs_0};
+		const U* bar {rhs_0};
+
+		for (; foo < lhs_N && bar < rhs_N;)
+		{
+			char32_t T_out;
+			char32_t U_out;
+
+			const auto T_size {c_str<T>::codec::next(foo)};
+			const auto U_size {c_str<U>::codec::next(bar)};
+
+			c_str<T>::codec::decode_ptr(foo, T_out, T_size);
+			c_str<U>::codec::decode_ptr(bar, U_out, U_size);
+
+			if (T_out == U_out)
+			{
+				return false;
+			}
+			foo += T_size;
+			bar += U_size;
+		}
+		return true;
+	}
+	else
+	{
+		return __size__(lhs_0, lhs_N) != __size__(rhs_0, rhs_N)
+		       ||
+		       !std::ranges::equal(lhs_0, lhs_N, rhs_0, rhs_N);
+	}
+}
+
+template<unit_t T, allo_t A>
+template<unit_t U          >
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::__split__(const T* head , const T* tail ,
+                                      const U* str_0, const U* str_N) noexcept -> std::vector<slice>
+{
+	if constexpr (!std::is_same_v<T, U>)
+	{
+		std::vector<slice> out;
+
+		const T* foo {head};
+		const T* bar {head};
+
+		size_t ahead {0};
+		size_t equal {0};
+
+		const T* lorem;
+		const U* ipsum;
+
+		for (; bar + ahead < tail; bar += c_str<T>::codec::next(bar))
+		{
+			for (equal = 0, lorem = bar, ipsum = str_0; lorem < tail && ipsum < str_N; ++equal)
+			{
+				char32_t T_out;
+				char32_t U_out;
+
+				const auto T_size {c_str<T>::codec::next(lorem)};
+				const auto U_size {c_str<U>::codec::next(ipsum)};
+
+				c_str<T>::codec::decode_ptr(lorem, T_out, T_size);
+				c_str<U>::codec::decode_ptr(ipsum, U_out, U_size);
+
+				if (T_out != U_out)
+				{
+					break;
+				}
+				lorem += T_size;
+				ipsum += U_size;
+			}
+
+			if (ipsum == str_N)
+			{
+				out.emplace_back(&foo[0], &bar[0]);
+
+				foo = bar += (ahead = lorem - bar);
+			}
+		}
+		if (foo < tail)
+		{
+			out.emplace_back(foo, tail);
+		}
+		return out;
+	}
+	else
+	{
+		const auto XXX//{(SIZE)};
+		{__size__(str_0, str_N)};
+		
+		std::vector<slice> out;
+
+		const T* foo {head};
+		const T* bar {head};
+
+		size_t N {0};
+
+		for (; bar + XXX < tail; bar += c_str<T>::codec::next(bar))
+		{
+			for (N = 0; N < XXX; ++N)
+			{
+				if (bar[N] != str_0[N]) { break; }
+			}
+
+			if (/* equal */ N == XXX)
+			{
+				out.emplace_back(&foo[0], &bar[0]);
+
+				foo = bar += XXX;
+			}
+		}
+		if (foo < tail)
+		{
+			out.emplace_back(foo, tail);
+		}
+		return out;
+	}
+}
+
+template<unit_t T, allo_t A>
+template<unit_t U          >
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::__match__(const T* head , const T* tail ,
+                                      const U* str_0, const U* str_N) noexcept -> std::vector<slice>
+{
+	if constexpr (!std::is_same_v<T, U>)
+	{
+		std::vector<slice> out;
+
+		const T* foo {head};
+
+		size_t ahead {0};
+		size_t equal {0};
+
+		const T* lorem;
+		const U* ipsum;
+
+		for (; foo + ahead < tail; foo += c_str<T>::codec::next(foo))
+		{
+			for (equal = 0, lorem = foo, ipsum = str_0; lorem < tail && ipsum < str_N; ++equal)
+			{
+				char32_t T_out;
+				char32_t U_out;
+
+				const auto T_size {c_str<T>::codec::next(lorem)};
+				const auto U_size {c_str<U>::codec::next(ipsum)};
+
+				c_str<T>::codec::decode_ptr(lorem, T_out, T_size);
+				c_str<U>::codec::decode_ptr(ipsum, U_out, U_size);
+
+				if (T_out != U_out)
+				{
+					break;
+				}
+				lorem += T_size;
+				ipsum += U_size;
+			}
+
+			if (ipsum == str_N)
+			{
+				out.emplace_back(foo, lorem);
+
+				foo += (ahead = lorem - foo);
+			}
+		}
+		return out;
+	}
+	else
+	{
+		const auto XXX//{(SIZE)};
+		{__size__(str_0, str_N)};
+		
+		std::vector<slice> out;
+
+		const T* foo {head};
+
+		size_t N;
+
+		for (; foo + XXX < tail; foo += c_str<T>::codec::next(foo))
+		{
+			for (N = 0; N < XXX; ++N)
+			{
+				if (foo[N] == str_0[N]) { break; }
+			}
+
+			if (/* equal */ N == XXX)
+			{
+				out.emplace_back(&foo[0], &foo[N]);
+
+				foo += XXX;
+			}
+		}
+		return out;
+	}
+}
+
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, clamp start, clamp until) noexcept -> slice
 {
 	assert(until < start);
 
@@ -1023,7 +1368,9 @@ IMPL constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, clamp  
 	return {bar, foo};
 }
 
-IMPL constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, clamp  start, range  until) noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, clamp start, range until) noexcept -> slice
 {
 	const T* foo {tail};
 
@@ -1037,7 +1384,9 @@ IMPL constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, clamp  
 	return {foo, bar};
 }
 
-IMPL constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, size_t start, clamp  until) noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, size_t start, clamp until) noexcept -> slice
 {
 	const T* foo {head};
 
@@ -1053,7 +1402,9 @@ IMPL constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, size_t 
 	return {foo, bar};
 }
 
-IMPL constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, size_t start, range  until) noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, size_t start, range until) noexcept -> slice
 {
 	const T* foo {head};
 
@@ -1067,7 +1418,9 @@ IMPL constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, size_t 
 	return {foo, bar};
 }
 
-IMPL constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, size_t start, size_t until) noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, size_t start, size_t until) noexcept -> slice
 {
 	assert(start < until);
 
@@ -1085,24 +1438,34 @@ IMPL constexpr auto c_str<T, A>::__range__(const T* head, const T* tail, size_t 
 	return {foo, bar};
 }
 
+#pragma endregion core
+
 #pragma region SSO
 
-IMPL constexpr c_str<T, A>::buffer::operator const T*() const noexcept
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr c_str<T, A>::buffer::operator const T*() const noexcept
 {
 	return this->head;
 }
 
-IMPL constexpr c_str<T, A>::buffer::operator       T*()       noexcept
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr c_str<T, A>::buffer::operator /*&*/ T*() /*&*/ noexcept
 {
 	return this->head;
 }
 
-IMPL constexpr c_str<T, A>::storage::storage() noexcept
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr c_str<T, A>::storage::storage() noexcept
 {
 	this->__union__.bytes[RMB] = MAX << SFT;
 }
 
-IMPL constexpr c_str<T, A>::storage::~storage() noexcept
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr c_str<T, A>::storage::~storage() noexcept
 {
 	if (this->mode() == LARGE)
 	{
@@ -1118,17 +1481,23 @@ IMPL constexpr c_str<T, A>::storage::~storage() noexcept
 	}
 }
 
-IMPL constexpr auto c_str<T, A>::storage::mode() const noexcept -> mode_t
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::storage::mode() const noexcept -> mode_t
 {
 	return static_cast<mode_t>(this->__union__.bytes[RMB] & MSK);
 }
 
-IMPL constexpr auto c_str<T, A>::storage::mode()       noexcept -> mode_t
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::storage::mode() /*&*/ noexcept -> mode_t
 {
 	return static_cast<mode_t>(this->__union__.bytes[RMB] & MSK);
 }
 
-IMPL constexpr auto c_str<T, A>::head() const noexcept -> const T*
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::head() const noexcept -> const T*
 {
 	return this->store.mode() == SMALL
 	       ?
@@ -1137,7 +1506,9 @@ IMPL constexpr auto c_str<T, A>::head() const noexcept -> const T*
 	       &this->store.__union__.large[0 /* ✨ roeses are red, violets are blue ✨ */];
 }
 
-IMPL constexpr auto c_str<T, A>::head()       noexcept ->       T*
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::head() /*&*/ noexcept -> /*&*/ T*
 {
 	return this->store.mode() == SMALL
 	       ?
@@ -1146,7 +1517,9 @@ IMPL constexpr auto c_str<T, A>::head()       noexcept ->       T*
 	       &this->store.__union__.large[0 /* ✨ roeses are red, violets are blue ✨ */];
 }
 
-IMPL constexpr auto c_str<T, A>::tail() const noexcept -> const T*
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::tail() const noexcept -> const T*
 {
 	return this->store.mode() == SMALL
 	       ?
@@ -1155,7 +1528,9 @@ IMPL constexpr auto c_str<T, A>::tail() const noexcept -> const T*
 	       &this->store.__union__.large[0x0 + (this->store.__union__.large.size >> 0x0)];
 }
 
-IMPL constexpr auto c_str<T, A>::tail()       noexcept ->       T*
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::tail() /*&*/ noexcept -> /*&*/ T*
 {
 	return this->store.mode() == SMALL
 	       ?
@@ -1168,7 +1543,9 @@ IMPL constexpr auto c_str<T, A>::tail()       noexcept ->       T*
 
 #pragma region codec
 
-IMPL constexpr auto c_str<T, A>::codec::size(char32_t code) noexcept -> int8_t
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::codec::size(char32_t code) noexcept -> int8_t
 {
 	if constexpr (std::is_same_v<T, char>)
 	{
@@ -1204,7 +1581,9 @@ IMPL constexpr auto c_str<T, A>::codec::size(char32_t code) noexcept -> int8_t
 	}
 }
 
-IMPL constexpr auto c_str<T, A>::codec::next(const T* ptr) noexcept -> int8_t
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::codec::next(const T* ptr ) noexcept -> int8_t
 {
 	constexpr static const int8_t TABLE[]
 	{
@@ -1238,7 +1617,9 @@ IMPL constexpr auto c_str<T, A>::codec::next(const T* ptr) noexcept -> int8_t
 	}
 }
 
-IMPL constexpr auto c_str<T, A>::codec::back(const T* ptr) noexcept -> int8_t
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::codec::back(const T* ptr ) noexcept -> int8_t
 {
 	if constexpr (std::is_same_v<T, char>)
 	{
@@ -1251,7 +1632,7 @@ IMPL constexpr auto c_str<T, A>::codec::back(const T* ptr) noexcept -> int8_t
 	}
 	if constexpr (std::is_same_v<T, char16_t>)
 	{
-		// walk backward until encountering leading surrogate is found
+		// walk backward until leading surrogate code unit is found
 		int8_t i {-1}; for (; (ptr[i] >> 0xA) == 0x37; --i) {} return i;
 	}
 	if constexpr (std::is_same_v<T, char32_t>)
@@ -1260,7 +1641,9 @@ IMPL constexpr auto c_str<T, A>::codec::back(const T* ptr) noexcept -> int8_t
 	}
 }
 
-IMPL constexpr auto c_str<T, A>::codec::encode_ptr(const char32_t in, T* out, int8_t size) noexcept -> void
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::codec::encode_ptr(const char32_t in, T* out, int8_t size) noexcept -> void
 {
 	if constexpr (std::is_same_v<T, char>)
 	{
@@ -1329,7 +1712,9 @@ IMPL constexpr auto c_str<T, A>::codec::encode_ptr(const char32_t in, T* out, in
 	}
 }
 
-IMPL constexpr auto c_str<T, A>::codec::decode_ptr(const T* in, char32_t& out, int8_t size) noexcept -> void
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::codec::decode_ptr(const T* in, char32_t& out, int8_t size) noexcept -> void
 {
 	if constexpr (std::is_same_v<T, char>)
 	{
@@ -1409,7 +1794,9 @@ IMPL constexpr auto c_str<T, A>::codec::decode_ptr(const T* in, char32_t& out, i
 
 #pragma region cursor
 
-IMPL constexpr auto c_str<T, A>::cursor::operator*() noexcept -> char32_t
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::cursor::operator*() noexcept -> char32_t
 {
 	char32_t code;
 
@@ -1419,37 +1806,51 @@ IMPL constexpr auto c_str<T, A>::cursor::operator*() noexcept -> char32_t
 	return code;
 }
 
-IMPL constexpr auto c_str<T, A>::cursor::operator&() noexcept -> const T*
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::cursor::operator&() noexcept -> const T*
 {
 	return this->ptr;
 }
 
-IMPL constexpr auto c_str<T, A>::cursor::operator++(   ) noexcept -> cursor&
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::cursor::operator++(   ) noexcept -> cursor&
 {
 	this->ptr += codec::next(this->ptr); return *this;
 }
 
-IMPL constexpr auto c_str<T, A>::cursor::operator++(int) noexcept -> cursor
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::cursor::operator++(int) noexcept -> cursor
 {
 	const auto clone {*this}; operator++(); return clone;
 }
 
-IMPL constexpr auto c_str<T, A>::cursor::operator--(   ) noexcept -> cursor&
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::cursor::operator--(   ) noexcept -> cursor&
 {
 	this->ptr += codec::back(this->ptr); return *this;
 }
 
-IMPL constexpr auto c_str<T, A>::cursor::operator--(int) noexcept -> cursor
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::cursor::operator--(int) noexcept -> cursor
 {
 	const auto clone {*this}; operator--(); return clone;
 }
 
-IMPL constexpr auto c_str<T, A>::cursor::operator==(const cursor& rhs) noexcept -> bool
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::cursor::operator==(const cursor& rhs) noexcept -> bool
 {
 	return this->ptr == rhs.ptr;
 }
 
-IMPL constexpr auto c_str<T, A>::cursor::operator!=(const cursor& rhs) noexcept -> bool
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::cursor::operator!=(const cursor& rhs) noexcept -> bool
 {
 	return this->ptr != rhs.ptr;
 }
@@ -1458,36 +1859,9 @@ IMPL constexpr auto c_str<T, A>::cursor::operator!=(const cursor& rhs) noexcept 
 
 #pragma region c_str
 
-IMPL constexpr auto c_str<T, A>::size() const noexcept -> size_t
-{
-	return this->store.mode() == SMALL
-	       ?
-	       MAX - (this->store.__union__.bytes[RMB] >> SFT)
-	       :
-	       0x0 + (this->store.__union__.large.size >> 0x0);
-}
-
-IMPL constexpr auto c_str<T, A>::length() const noexcept -> size_t
-{
-	if constexpr (std::is_same_v<T, char> // ❓
-	              ||
-	              std::is_same_v<T, char32_t>)
-	{
-		return this->size();
-	}
-	auto* head {this->head()};
-	auto* tail {this->tail()};
-
-	size_t out {0};
-
-	for (; head < tail - 1; ++out)
-	{
-		head += codec::next(head);
-	}
-	return out;
-}
-
-IMPL constexpr auto c_str<T, A>::__size__(size_t value)        noexcept -> void
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::__size__(size_t value) /*&*/ noexcept -> void
 {
 	switch (this->store.mode())
 	{
@@ -1518,7 +1892,9 @@ IMPL constexpr auto c_str<T, A>::__size__(size_t value)        noexcept -> void
 	}
 }
 
-IMPL constexpr auto c_str<T, A>::capacity(/* getter */) const noexcept -> size_t
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::capacity(/* getter */) const noexcept -> size_t
 {
 	return this->store.mode() == SMALL
 	       ?
@@ -1527,11 +1903,13 @@ IMPL constexpr auto c_str<T, A>::capacity(/* getter */) const noexcept -> size_t
 		   this->store.__union__.large.tail - this->store.__union__.large.head - 1;
 }
 
-IMPL constexpr auto c_str<T, A>::capacity(size_t value)       noexcept -> void
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::capacity(size_t value) /*&*/ noexcept -> void
 {
 	if (this->capacity() < value)
 	{
-		auto* head {std::allocator_traits<A>::allocate(this->store, value + 1)};
+		T* head {std::allocator_traits<A>::allocate(this->store, value + 1)};
 
 		// data migration
 		std::ranges::copy
@@ -1554,7 +1932,7 @@ IMPL constexpr auto c_str<T, A>::capacity(size_t value)       noexcept -> void
 			);
 		}
 
-		auto* tail {head + value + 1};
+		T* tail {head + value + 1};
 
 		const auto size {this->size()};
 
@@ -1565,122 +1943,199 @@ IMPL constexpr auto c_str<T, A>::capacity(size_t value)       noexcept -> void
 	}
 }
 
-IMPL /* ver. T=c_str */ constexpr auto c_str<T, A>::split(const c_str& value) const noexcept -> std::vector<slice>
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::size() const noexcept -> size_t
+{
+	return __size__(this->head(), this->tail());
+}
+
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::length() const noexcept -> size_t
+{
+	return __length__(this->head(), this->tail());
+}
+
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::split(const c_str<U, B>/*T^T*/& value) const noexcept -> std::vector<slice>
 {
 	return __split__(this->head(), this->tail(), value.head(), value.tail());
 }
 
-IMPL /* ver. T=slice */ constexpr auto c_str<T, A>::split(const slice& value) const noexcept -> std::vector<slice>
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::split(const c_str<U, B>::slice& value) const noexcept -> std::vector<slice>
 {
 	return __split__(this->head(), this->tail(), value.head, value.tail);
 }
 
-IMPL template<size_t N> constexpr auto c_str<T, A>::split(const T (&value)[N]) const noexcept -> std::vector<slice>
+template<unit_t T, allo_t A>
+template<unit_t U, size_t N>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::split(const U/*{literal}*/(&value)[N]) const noexcept -> std::vector<slice>
 {
-	return __split__(this->head(), this->tail(), &value[0], &value[N - 1]);
+	return __split__(this->head(), this->tail(), &value[0x0], &value[N-1]);
 }
 
-IMPL /* ver. T=c_str */ constexpr auto c_str<T, A>::match(const c_str& value) const noexcept -> std::vector<slice>
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::match(const c_str<U, B>/*T^T*/& value) const noexcept -> std::vector<slice>
 {
 	return __match__(this->head(), this->tail(), value.head(), value.tail());
 }
 
-IMPL /* ver. T=slice */ constexpr auto c_str<T, A>::match(const slice& value) const noexcept -> std::vector<slice>
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::match(const c_str<U, B>::slice& value) const noexcept -> std::vector<slice>
 {
 	return __match__(this->head(), this->tail(), value.head, value.tail);
 }
 
-IMPL template<size_t N> constexpr auto c_str<T, A>::match(const T (&value)[N]) const noexcept -> std::vector<slice>
+template<unit_t T, allo_t A>
+template<unit_t U, size_t N>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::match(const U/*{literal}*/(&value)[N]) const noexcept -> std::vector<slice>
 {
-	return __match__(this->head(), this->tail(), &value[0], &value[N - 1]);
+	return __match__(this->head(), this->tail(), &value[0x0], &value[N-1]);
 }
 
-IMPL /* ver. T=c_str */ constexpr auto c_str<T, A>::starts_with(const c_str& value) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::starts_with(const c_str<U, B>/*T^T*/& value) const noexcept -> bool
 {
-	return (*this)(0, value.length()) == value;
+	return operator[](0, value.length()) == value;
 }
 
-IMPL /* ver. T=slice */ constexpr auto c_str<T, A>::starts_with(const slice& value) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::starts_with(const c_str<U, B>::slice& value) const noexcept -> bool
 {
-	return (*this)(0, value.length()) == value;
+	return operator[](0, value.length()) == value;
 }
 
-IMPL template<size_t N> constexpr auto c_str<T, A>::starts_with(const T (&value)[N]) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, size_t N>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::starts_with(const U/*{literal}*/(&value)[N]) const noexcept -> bool
 {
-	return (*this)(0, (N - 1)) == value;
+	return operator[](0, (N - 1)) == value;
 }
 
-IMPL /* ver. T=c_str */ constexpr auto c_str<T, A>::ends_with(const c_str& value) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::ends_with(const c_str<U, B>/*T^T*/& value) const noexcept -> bool
 {
-	return (*this)(range::N - value.length(), range::N) == value;
+	return operator[](range::N - value.length(), range::N) == value;
 }
 
-IMPL /* ver. T=slice */ constexpr auto c_str<T, A>::ends_with(const slice& value) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::ends_with(const c_str<U, B>::slice& value) const noexcept -> bool
 {
-	return (*this)(range::N - value.length(), range::N) == value;
+	return operator[](range::N - value.length(), range::N) == value;
 }
 
-IMPL template<size_t N> constexpr auto c_str<T, A>::ends_with(const T (&value)[N]) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, size_t N>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::ends_with(const U/*{literal}*/(&value)[N]) const noexcept -> bool
 {
-	return (*this)(range::N - (N - 1), range::N) == value;
+	return operator[](range::N - (N - 1), range::N) == value;
 }
 
-IMPL /* ver. T=c_str */ constexpr auto c_str<T, A>::contains(const c_str& value) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::contains(const c_str<U, B>/*T^T*/& value) const noexcept -> bool
 {
 	return !this->match(value).empty();
 }
 
-IMPL /* ver. T=slice */ constexpr auto c_str<T, A>::contains(const slice& value) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::contains(const c_str<U, B>::slice& value) const noexcept -> bool
 {
 	return !this->match(value).empty();
 }
 
-IMPL template<size_t N> constexpr auto c_str<T, A>::contains(const T (&value)[N]) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, size_t N>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::contains(const U/*{literal}*/(&value)[N]) const noexcept -> bool
 {
 	return !this->match(value).empty();
 }
 
-IMPL constexpr auto c_str<T, A>::begin() const noexcept -> cursor
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::begin() const noexcept -> cursor
 {
 	return {this->head()};
 }
 
-IMPL constexpr auto c_str<T, A>::end() const noexcept -> cursor
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::end() const noexcept -> cursor
 {
 	return {this->tail()};
 }
 
-IMPL constexpr auto c_str<T, A>::operator[](size_t value) const noexcept -> reader
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::operator[](size_t value) const noexcept -> reader
 {
 	return {this, value};
 }
 
-IMPL constexpr auto c_str<T, A>::operator[](size_t value)       noexcept -> writer
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::operator[](size_t value) /*&*/ noexcept -> writer
 {
 	return {this, value};
 }
 
-IMPL constexpr auto c_str<T, A>::operator[](clamp  start, clamp  until) const noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::operator[](clamp start, clamp until) const noexcept -> slice
 {
 	return __range__(this->head(), this->tail(), start, until);
 }
 
-IMPL constexpr auto c_str<T, A>::operator[](clamp  start, range  until) const noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::operator[](clamp start, range until) const noexcept -> slice
 {
 	return __range__(this->head(), this->tail(), start, until);
 }
 
-IMPL constexpr auto c_str<T, A>::operator[](size_t start, clamp  until) const noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::operator[](size_t start, clamp until) const noexcept -> slice
 {
 	return __range__(this->head(), this->tail(), start, until);
 }
 
-IMPL constexpr auto c_str<T, A>::operator[](size_t start, range  until) const noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::operator[](size_t start, range until) const noexcept -> slice
 {
 	return __range__(this->head(), this->tail(), start, until);
 }
 
-IMPL constexpr auto c_str<T, A>::operator[](size_t start, size_t until) const noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::operator[](size_t start, size_t until) const noexcept -> slice
 {
 	return __range__(this->head(), this->tail(), start, until);
 }
@@ -1689,149 +2144,198 @@ IMPL constexpr auto c_str<T, A>::operator[](size_t start, size_t until) const no
 
 #pragma region slice
 
-IMPL constexpr auto c_str<T, A>::slice::size() const noexcept -> size_t
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::size() const noexcept -> size_t
 {
-	return static_cast<const T*>(this->tail)
-	       -
-	       static_cast<const T*>(this->head);
+	return __size__(this->head, this->tail);
 }
 
-IMPL constexpr auto c_str<T, A>::slice::length() const noexcept -> size_t
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::length() const noexcept -> size_t
 {
-	if constexpr (std::is_same_v<T, char> // ❓
-	              ||
-	              std::is_same_v<T, char32_t>)
-	{
-		return this->size();
-	}
-	auto* head {this->head};
-	auto* tail {this->tail};
-	
-	size_t out {0};
-	
-	for (; head < tail - 0; ++out)
-	{
-		head += codec::next(head);
-	}
-	return out;
+	return __length__(this->head, this->tail);
 }
 
-IMPL /* ver. T=c_str */ constexpr auto c_str<T, A>::slice::split(const c_str& value) const noexcept -> std::vector<slice>
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::split(const c_str<U, B>/*T^T*/& value) const noexcept -> std::vector<slice>
 {
 	return __split__(this->head, this->tail, value.head(), value.tail());
 }
 
-IMPL /* ver. T=slice */ constexpr auto c_str<T, A>::slice::split(const slice& value) const noexcept -> std::vector<slice>
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::split(const c_str<U, B>::slice& value) const noexcept -> std::vector<slice>
 {
 	return __split__(this->head, this->tail, value.head, value.tail);
 }
 
-IMPL template<size_t N> constexpr auto c_str<T, A>::slice::split(const T (&value)[N]) const noexcept -> std::vector<slice>
+template<unit_t T, allo_t A>
+template<unit_t U, size_t N>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::split(const U/*{literal}*/(&value)[N]) const noexcept -> std::vector<slice>
 {
-	return __split__(this->head, this->tail, &value[0], &value[N - 1]);
+	return __split__(this->head, this->tail, &value[0x0], &value[N-1]);
 }
 
-IMPL /* ver. T=c_str */ constexpr auto c_str<T, A>::slice::match(const c_str& value) const noexcept -> std::vector<slice>
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::match(const c_str<U, B>/*T^T*/& value) const noexcept -> std::vector<slice>
 {
 	return __match__(this->head, this->tail, value.head(), value.tail());
 }
 
-IMPL /* ver. T=slice */ constexpr auto c_str<T, A>::slice::match(const slice& value) const noexcept -> std::vector<slice>
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::match(const c_str<U, B>::slice& value) const noexcept -> std::vector<slice>
 {
 	return __match__(this->head, this->tail, value.head, value.tail);
 }
 
-IMPL template<size_t N> constexpr auto c_str<T, A>::slice::match(const T (&value)[N]) const noexcept -> std::vector<slice>
+template<unit_t T, allo_t A>
+template<unit_t U, size_t N>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::match(const U/*{literal}*/(&value)[N]) const noexcept -> std::vector<slice>
 {
-	return __match__(this->head, this->tail, &value[0], &value[N - 1]);
+	return __match__(this->head, this->tail, &value[0x0], &value[N-1]);
 }
 
-IMPL /* ver. T=c_str */ constexpr auto c_str<T, A>::slice::starts_with(const c_str& value) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::starts_with(const c_str<U, B>/*T^T*/& value) const noexcept -> bool
 {
-	return (*this)(0, value.length()) == value;
+	return operator[](0, value.length()) == value;
 }
 
-IMPL /* ver. T=slice */ constexpr auto c_str<T, A>::slice::starts_with(const slice& value) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::starts_with(const c_str<U, B>::slice& value) const noexcept -> bool
 {
-	return (*this)(0, value.length()) == value;
+	return operator[](0, value.length()) == value;
 }
 
-IMPL template<size_t N> constexpr auto c_str<T, A>::slice::starts_with(const T (&value)[N]) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, size_t N>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::starts_with(const U/*{literal}*/(&value)[N]) const noexcept -> bool
 {
-	return (*this)(0, (N - 1)) == value;
+	return operator[](0, (N - 1)) == value;
 }
 
-IMPL /* ver. T=c_str */ constexpr auto c_str<T, A>::slice::ends_with(const c_str& value) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::ends_with(const c_str<U, B>/*T^T*/& value) const noexcept -> bool
 {
-	return (*this)(range::N - value.length(), range::N) == value;
+	return operator[](range::N - value.length(), range::N) == value;
 }
 
-IMPL /* ver. T=slice */ constexpr auto c_str<T, A>::slice::ends_with(const slice& value) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::ends_with(const c_str<U, B>::slice& value) const noexcept -> bool
 {
-	return (*this)(range::N - value.length(), range::N) == value;
+	return operator[](range::N - value.length(), range::N) == value;
 }
 
-IMPL template<size_t N> constexpr auto c_str<T, A>::slice::ends_with(const T (&value)[N]) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, size_t N>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::ends_with(const U/*{literal}*/(&value)[N]) const noexcept -> bool
 {
-	return (*this)(range::N - (N - 1), range::N) == value;
+	return operator[](range::N - (N - 1), range::N) == value;
 }
 
-IMPL /* ver. T=c_str */ constexpr auto c_str<T, A>::slice::contains(const c_str& value) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::contains(const c_str<U, B>/*T^T*/& value) const noexcept -> bool
 {
 	return !this->match(value).empty();
 }
 
-IMPL /* ver. T=slice */ constexpr auto c_str<T, A>::slice::contains(const slice& value) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, allo_t B>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::contains(const c_str<U, B>::slice& value) const noexcept -> bool
 {
 	return !this->match(value).empty();
 }
 
-IMPL template<size_t N> constexpr auto c_str<T, A>::slice::contains(const T (&value)[N]) const noexcept -> bool
+template<unit_t T, allo_t A>
+template<unit_t U, size_t N>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::contains(const U/*{literal}*/(&value)[N]) const noexcept -> bool
 {
 	return !this->match(value).empty();
 }
 
-IMPL constexpr auto c_str<T, A>::slice::begin() const noexcept -> cursor
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::begin() const noexcept -> cursor
 {
 	return {this->head};
 }
 
-IMPL constexpr auto c_str<T, A>::slice::end() const noexcept -> cursor
+template<unit_t T, allo_t A>
+constexpr auto c_str<T, A>::slice::end() const noexcept -> cursor
 {
 	return {this->tail};
 }
 
-IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value) const noexcept -> reader
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::operator[](size_t value) const noexcept -> reader
 {
 	return {this, value};
 }
 
-IMPL constexpr auto c_str<T, A>::slice::operator[](size_t value)       noexcept -> writer
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::operator[](size_t value) /*&*/ noexcept -> writer
 {
 	return {this, value};
 }
 
-IMPL constexpr auto c_str<T, A>::slice::operator[](clamp  start, clamp  until) const noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::operator[](clamp start, clamp until) const noexcept -> slice
 {
 	return __range__(this->head, this->tail, start, until);
 }
 
-IMPL constexpr auto c_str<T, A>::slice::operator[](clamp  start, range  until) const noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::operator[](clamp start, range until) const noexcept -> slice
 {
 	return __range__(this->head, this->tail, start, until);
 }
 
-IMPL constexpr auto c_str<T, A>::slice::operator[](size_t start, clamp  until) const noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::operator[](size_t start, clamp until) const noexcept -> slice
 {
 	return __range__(this->head, this->tail, start, until);
 }
 
-IMPL constexpr auto c_str<T, A>::slice::operator[](size_t start, range  until) const noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::operator[](size_t start, range until) const noexcept -> slice
 {
 	return __range__(this->head, this->tail, start, until);
 }
 
-IMPL constexpr auto c_str<T, A>::slice::operator[](size_t start, size_t until) const noexcept -> slice
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::slice::operator[](size_t start, size_t until) const noexcept -> slice
 {
 	return __range__(this->head, this->tail, start, until);
 }
@@ -1840,10 +2344,12 @@ IMPL constexpr auto c_str<T, A>::slice::operator[](size_t start, size_t until) c
 
 #pragma region c_str::reader
 
-IMPL [[nodiscard]] constexpr c_str<T, A>::reader::operator char32_t() const noexcept
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+[[nodiscard]] constexpr c_str<T, A>::reader::operator char32_t() const noexcept
 {
-	auto* head {this->src->head()};
-	auto* tail {this->src->tail()};
+	const T* head {this->src->head()};
+	const T* tail {this->src->tail()};
 
 	size_t i {0};
 
@@ -1876,12 +2382,16 @@ IMPL [[nodiscard]] constexpr c_str<T, A>::reader::operator char32_t() const noex
 	return U'\uFFFD';
 }
 
-IMPL auto constexpr c_str<T, A>::reader::operator==(char32_t code) const noexcept -> bool
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+auto constexpr c_str<T, A>::reader::operator==(char32_t code) const noexcept -> bool
 {
 	return operator char32_t() == code;
 }
 
-IMPL auto constexpr c_str<T, A>::reader::operator!=(char32_t code) const noexcept -> bool
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+auto constexpr c_str<T, A>::reader::operator!=(char32_t code) const noexcept -> bool
 {
 	return operator char32_t() != code;
 }
@@ -1890,10 +2400,12 @@ IMPL auto constexpr c_str<T, A>::reader::operator!=(char32_t code) const noexcep
 
 #pragma region c_str::writer
 
-IMPL constexpr auto c_str<T, A>::writer::operator=(char32_t code) noexcept -> writer&
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+constexpr auto c_str<T, A>::writer::operator=(char32_t code) noexcept -> writer&
 {
-	auto* head {this->src->head()};
-	auto* tail {this->src->tail()};
+	T* head {this->src->head()};
+	T* tail {this->src->tail()};
 
 	size_t i {0};
 
@@ -1980,10 +2492,12 @@ IMPL constexpr auto c_str<T, A>::writer::operator=(char32_t code) noexcept -> wr
 
 #pragma region slice::reader
 
-IMPL [[nodiscard]] constexpr c_str<T, A>::slice::reader::operator char32_t() const noexcept
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+[[nodiscard]] constexpr c_str<T, A>::slice::reader::operator char32_t() const noexcept
 {
-	auto* head {this->src->head};
-	auto* tail {this->src->tail};
+	const T* head {this->src->head};
+	const T* tail {this->src->tail};
 
 	size_t i {0};
 
@@ -2016,19 +2530,21 @@ IMPL [[nodiscard]] constexpr c_str<T, A>::slice::reader::operator char32_t() con
 	return U'\uFFFD';
 }
 
-IMPL auto constexpr c_str<T, A>::slice::reader::operator==(char32_t code) const noexcept -> bool
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+auto constexpr c_str<T, A>::slice::reader::operator==(char32_t code) const noexcept -> bool
 {
 	return operator char32_t() == code;
 }
 
-IMPL auto constexpr c_str<T, A>::slice::reader::operator!=(char32_t code) const noexcept -> bool
+template<unit_t T, allo_t A>
+//───────────୨ৎ───────────//
+auto constexpr c_str<T, A>::slice::reader::operator!=(char32_t code) const noexcept -> bool
 {
 	return operator char32_t() != code;
 }
 
 #pragma endregion slice::reader
-
-#undef IMPL
 
 #undef COPY_PTR_LOGIC
 #undef SWAP_PTR_LOGIC
@@ -2039,14 +2555,9 @@ IMPL auto constexpr c_str<T, A>::slice::reader::operator!=(char32_t code) const 
 #undef COPY_CONSTRUCTOR
 #undef MOVE_CONSTRUCTOR
 
-// https://en.wikipedia.org/wiki/UTF-8
-typedef c_str<char8_t> utf8;
-// https://en.wikipedia.org/wiki/UTF-16
-typedef c_str<char16_t> utf16;
-// https://en.wikipedia.org/wiki/UTF-32
-typedef c_str<char32_t> utf32;
-
-template<class S> auto fileof(const S& path) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+template<typename STRING   >
+//───────────୨ৎ───────────//
+auto fileof(const STRING& path) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
 {
 	enum format : uint8_t
 	{
@@ -2064,9 +2575,9 @@ template<class S> auto fileof(const S& path) noexcept -> std::optional<std::vari
 		{
 			char buffer[4];
 
-			ifs.seekg(0, std::ios::beg); // cursor to the beginning of the file 1
+			ifs.seekg(0, std::ios::beg); // move to the beginning of the file :D
 			ifs.read(&buffer[0], 4); const auto bytes {ifs.gcount()}; ifs.clear();
-			ifs.seekg(0, std::ios::beg); // cursor to the beginning of the file 2
+			ifs.seekg(0, std::ios::beg); // move to the beginning of the file :D
 
 			// 00 00 FE FF
 			if (4 <= bytes
@@ -2123,8 +2634,8 @@ template<class S> auto fileof(const S& path) noexcept -> std::optional<std::vari
 		{
 			T buffer;
 
-			auto* foo {str.head()};
-			auto* bar {str.head()};
+			T* foo {str.head()};
+			T* bar {str.head()};
 
 			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
 			{
@@ -2148,8 +2659,8 @@ template<class S> auto fileof(const S& path) noexcept -> std::optional<std::vari
 		{
 			T buffer;
 
-			auto* foo {str.head()};
-			auto* bar {str.head()};
+			T* foo {str.head()};
+			T* bar {str.head()};
 
 			while (ifs.read(reinterpret_cast<char*>(&buffer), sizeof(T)))
 			{
@@ -2262,24 +2773,11 @@ template<class S> auto fileof(const S& path) noexcept -> std::optional<std::vari
 	return std::nullopt;
 }
 
-template<size_t N> auto fileof(const char (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
+template<unit_t T, size_t N>
+//───────────୨ৎ───────────//
+auto fileof(const T (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
 {
-	return fileof(c_str {path});
-}
-
-template<size_t N> auto fileof(const char8_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
-{
-	return fileof(utf8 {path});
-}
-
-template<size_t N> auto fileof(const char16_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
-{
-	return fileof(utf16 {path});
-}
-
-template<size_t N> auto fileof(const char32_t (&path)[N]) noexcept -> std::optional<std::variant<c_str<char8_t>, c_str<char16_t>, c_str<char32_t>>>
-{
-	return fileof(utf32 {path});
+	return fileof(c_str<T>(path));
 }
 
 // NOLINTEND(*-magic-numbers, *-union-access, *-signed-bitwise, *-avoid-c-arrays, *-pointer-arithmetic, *-constant-array-index, *-explicit-conversions)
