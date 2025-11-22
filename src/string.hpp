@@ -204,13 +204,13 @@ class c_str
 		// returns the number of code points, excluding NULL-TERMINATOR.
 		constexpr auto length() const noexcept -> size_t;
 
-		// returns a list of string slice, of which are product of split (division).
+		// returns a list of string slice, of which are product of split aka division.
 		template<unit_t U, allo_t B>
 		constexpr auto split(const c_str<U, B>/*T^T*/& value) const noexcept -> std::vector<slice>;
-		// returns a list of string slice, of which are product of split (division).
+		// returns a list of string slice, of which are product of split aka division.
 		template<unit_t U, allo_t B>
 		constexpr auto split(const c_str<U, B>::slice& value) const noexcept -> std::vector<slice>;
-		// returns a list of string slice, of which are product of split (division).
+		// returns a list of string slice, of which are product of split aka division.
 		template<unit_t U, size_t N>
 		constexpr auto split(const U/*{literal}*/(&value)[N]) const noexcept -> std::vector<slice>;
 
@@ -224,24 +224,33 @@ class c_str
 		template<unit_t U, size_t N>
 		constexpr auto match(const U/*{literal}*/(&value)[N]) const noexcept -> std::vector<slice>;
 
+		// *self explanatory* returns whether or not it starts with *parameter*.
 		template<unit_t U, allo_t B>
 		constexpr auto starts_with(const c_str<U, B>/*T^T*/& value) const noexcept -> bool;
+		// *self explanatory* returns whether or not it starts with *parameter*.
 		template<unit_t U, allo_t B>
 		constexpr auto starts_with(const c_str<U, B>::slice& value) const noexcept -> bool;
+		// *self explanatory* returns whether or not it starts with *parameter*.
 		template<unit_t U, size_t N>
 		constexpr auto starts_with(const U/*{literal}*/(&value)[N]) const noexcept -> bool;
 
+		// *self explanatory* returns whether or not it ends with *parameter*.
 		template<unit_t U, allo_t B>
 		constexpr auto ends_with(const c_str<U, B>/*T^T*/& value) const noexcept -> bool;
+		// *self explanatory* returns whether or not it ends with *parameter*.
 		template<unit_t U, allo_t B>
 		constexpr auto ends_with(const c_str<U, B>::slice& value) const noexcept -> bool;
+		// *self explanatory* returns whether or not it ends with *parameter*.
 		template<unit_t U, size_t N>
 		constexpr auto ends_with(const U/*{literal}*/(&value)[N]) const noexcept -> bool;
 
+		// *self explanatory* returns whether or not it contains *parameter*.
 		template<unit_t U, allo_t B>
 		constexpr auto contains(const c_str<U, B>/*T^T*/& value) const noexcept -> bool;
+		// *self explanatory* returns whether or not it contains *parameter*.
 		template<unit_t U, allo_t B>
 		constexpr auto contains(const c_str<U, B>::slice& value) const noexcept -> bool;
+		// *self explanatory* returns whether or not it contains *parameter*.
 		template<unit_t U, size_t N>
 		constexpr auto contains(const U/*{literal}*/(&value)[N]) const noexcept -> bool;
 
@@ -526,13 +535,13 @@ public:
 	// changes the number of code units it can hold, excluding NULL-TERMINATOR.
 	constexpr auto capacity(size_t value) /*&*/ noexcept -> void;
 
-	// returns a list of string slice, of which are product of split (division).
+	// returns a list of string slice, of which are product of split aka division.
 	template<unit_t U, allo_t B>
 	constexpr auto split(const c_str<U, B>/*T^T*/& value) const noexcept -> std::vector<slice>;
-	// returns a list of string slice, of which are product of split (division).
+	// returns a list of string slice, of which are product of split aka division.
 	template<unit_t U, allo_t B>
 	constexpr auto split(const c_str<U, B>::slice& value) const noexcept -> std::vector<slice>;
-	// returns a list of string slice, of which are product of split (division).
+	// returns a list of string slice, of which are product of split aka division.
 	template<unit_t U, size_t N>
 	constexpr auto split(const U/*{literal}*/(&value)[N]) const noexcept -> std::vector<slice>;
 
@@ -546,24 +555,33 @@ public:
 	template<unit_t U, size_t N>
 	constexpr auto match(const U/*{literal}*/(&value)[N]) const noexcept -> std::vector<slice>;
 
+	// *self explanatory* returns whether or not it starts with *parameter*.
 	template<unit_t U, allo_t B>
 	constexpr auto starts_with(const c_str<U, B>/*T^T*/& value) const noexcept -> bool;
+	// *self explanatory* returns whether or not it starts with *parameter*.
 	template<unit_t U, allo_t B>
 	constexpr auto starts_with(const c_str<U, B>::slice& value) const noexcept -> bool;
+	// *self explanatory* returns whether or not it starts with *parameter*.
 	template<unit_t U, size_t N>
 	constexpr auto starts_with(const U/*{literal}*/(&value)[N]) const noexcept -> bool;
 
+	// *self explanatory* returns whether or not it ends with *parameter*.
 	template<unit_t U, allo_t B>
 	constexpr auto ends_with(const c_str<U, B>/*T^T*/& value) const noexcept -> bool;
+	// *self explanatory* returns whether or not it ends with *parameter*.
 	template<unit_t U, allo_t B>
 	constexpr auto ends_with(const c_str<U, B>::slice& value) const noexcept -> bool;
+	// *self explanatory* returns whether or not it ends with *parameter*.
 	template<unit_t U, size_t N>
 	constexpr auto ends_with(const U/*{literal}*/(&value)[N]) const noexcept -> bool;
 
+	// *self explanatory* returns whether or not it contains *parameter*.
 	template<unit_t U, allo_t B>
 	constexpr auto contains(const c_str<U, B>/*T^T*/& value) const noexcept -> bool;
+	// *self explanatory* returns whether or not it contains *parameter*.
 	template<unit_t U, allo_t B>
 	constexpr auto contains(const c_str<U, B>::slice& value) const noexcept -> bool;
+	// *self explanatory* returns whether or not it contains *parameter*.
 	template<unit_t U, size_t N>
 	constexpr auto contains(const U/*{literal}*/(&value)[N]) const noexcept -> bool;
 

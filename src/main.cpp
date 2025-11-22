@@ -35,31 +35,28 @@ TEST_CASE("[API] string")
 
 	SUBCASE("impl.split")
 	{
-		const utf8 str {u8"티라미수"
-		                  "☆"
-		                  "치즈케잌"
-		                  "☆"
-		                  "말차라떼"
-		                  "☆"
-		                  "딸기우유"};
+		// from utf-16 literal
+		const utf8 str {u"티라미수"
+		                 "☆"
+		                 "치즈케잌"
+		                 "☆"
+		                 "말차라떼"
+		                 "☆"
+		                 "딸기우유"};
 
-		// split by utf-16 literal
+		// from utf-16 literal
 		auto src {str.split(u"☆")};
 
+		// from utf-16 literal
 		CHECK(src[0] == u"티라미수");
-		CHECK(src[0] == U"티라미수");
 		CHECK(src[1] == u"치즈케잌");
-		CHECK(src[1] == U"치즈케잌");
 		CHECK(src[2] == u"말차라떼");
-		CHECK(src[2] == U"말차라떼");
 		CHECK(src[3] == u"딸기우유");
-		CHECK(src[3] == U"딸기우유");
 	}
 
 	SUBCASE("range syntax")
 	{
-		// init from utf-16 literal
-		const utf8 str {u"샤인모수끼"};
+		const utf8 str {u8"샤인모수끼"};
 
 		using range::N;
 
@@ -75,7 +72,7 @@ TEST_CASE("[API] fileof")
 {
 	SUBCASE("UTF-8")
 	{
-		const auto file {fileof(u8"./src/sample/utf8.txt")};
+		const auto file {fileof("./src/sample/utf8.txt")};
 
 		REQUIRE(file.has_value());
 

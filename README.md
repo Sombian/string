@@ -5,41 +5,45 @@
 requires **C++23** ot later.
 
 ```c++
-using range::N;
+#include "string.hpp"
 
-c_str str {"hello world"};
+int main() noexcept
+{
+	using range::N;
 
-std::cout << str[0, N]     << '\n';
-std::cout << str[0, 5]     << '\n';
-std::cout << str[0, N - 5] << '\n';
-std::cout << str[N - 5, N] << '\n';
+	c_str str {"hello world"};
+
+	assert(str == str[0, N]);
+
+	std::cout << str << '\n';
+}
 ```
 
-### c_str
+### `c_str`
 
 - size
 	- (getter)
-	- returns the number of code units, excluding NULL-TERMINATOR.
+	- returns the number of `code unit`s, excluding NULL-TERMINATOR.
 
 - length
 	- (getter)
-	- returns the number of code points, excluding NULL-TERMINATOR.
+	- returns the number of `code point`s, excluding NULL-TERMINATOR.
 
 - capacity
 	- (getter)
-	- returns the number of code units it can hold, excluding NULL-TERMINATOR.
+	- returns the number of `code unit`s it can hold, excluding NULL-TERMINATOR.
 
 - capacity
 	- (setter)
-	- changes the number of code units it can hold, excluding NULL-TERMINATOR.
+	- changes the number of `code unit`s it can hold, excluding NULL-TERMINATOR.
 
 - split
 	- (getter)
-	- returns a list of string slice, of which are product of split aka division.
+	- returns a list of string `slice`, of which are product of split aka division.
 
 - match
 	- (getter)
-	- returns a list of string slice, of which are product of search occurrence.
+	- returns a list of string `slice`, of which are product of search occurrence.
 
 - starts_width
 	- (getter)
@@ -55,25 +59,25 @@ std::cout << str[N - 5, N] << '\n';
 
 - [A, B]
 	- (getter)
-	- returns a slice in range, similar to that of Python's slicing.
+	- returns a `slice` in range, similar to that of Python's slicing.
 
-### slice
+### `slice`
 
 - size
 	- (getter)
-	- returns the number of code units, excluding NULL-TERMINATOR.
+	- returns the number of `code unit`s, excluding NULL-TERMINATOR.
 
 - length
 	- (getter)
-	- returns the number of code points, excluding NULL-TERMINATOR.
+	- returns the number of `code point`s, excluding NULL-TERMINATOR.
 
 - split
 	- (getter)
-	- returns a list of string slice, of which are product of split aka division.
+	- returns a list of string `slice`, of which are product of split aka division.
 
 - match
 	- (getter)
-	- returns a list of string slice, of which are product of search occurrence.
+	- returns a list of string `slice`, of which are product of search occurrence.
 
 - starts_width
 	- (getter)
@@ -89,4 +93,4 @@ std::cout << str[N - 5, N] << '\n';
 
 - [A, B]
 	- (getter)
-	- returns a slice in range, similar to that of Python's slicing.
+	- returns a `slice` in range, similar to that of Python's slicing.
