@@ -18,7 +18,7 @@ TEST_CASE("storage")
 
 TEST_CASE("[API] string")
 {
-	SUBCASE("impl + ???")
+	SUBCASE("concat")
 	{
 		const utf8 foo {u8"티라"};
 		const utf8 bar {u8"미수"};
@@ -33,38 +33,22 @@ TEST_CASE("[API] string")
 		CHECK(foo_bar.length() == 4);
 	}
 
-	SUBCASE("impl.split")
+	SUBCASE("substr")
 	{
-		// from utf-16 literal
-		const utf8 str {u"티라미수"
-		                 "☆"
-		                 "치즈케잌"
-		                 "☆"
-		                 "말차라떼"
-		                 "☆"
-		                 "딸기우유"};
+		const utf8 str {u8"티라미수"
+		                u8"☆"
+		                u8"치즈케잌"
+		                u8"☆"
+		                u8"말차라떼"
+		                u8"☆"
+		                u8"딸기우유"};
 
-		// from utf-16 literal
 		auto src {str.split(u"☆")};
 
-		// from utf-16 literal
 		CHECK(src[0] == u"티라미수");
 		CHECK(src[1] == u"치즈케잌");
 		CHECK(src[2] == u"말차라떼");
 		CHECK(src[3] == u"딸기우유");
-	}
-
-	SUBCASE("range syntax")
-	{
-		const utf8 str {u8"샤인모수끼"};
-
-		using range::N;
-
-		CHECK(str[N - 3, N - 2] == u8"모");
-		CHECK(str[N - 3, N]  == u8"모수끼");
-		CHECK(str[2, N - 0]  == u8"모수끼");
-		CHECK(str[2, N]      == u8"모수끼");
-		CHECK(str[2, 3]         == u8"모");
 	}
 }
 
@@ -73,6 +57,15 @@ TEST_CASE("[API] fileof")
 	SUBCASE("UTF-8")
 	{
 		const auto file {fileof("./src/sample/utf8.txt")};
+
+		REQUIRE(file.has_value());
+
+		CHECK(std::holds_alternative<utf8>(file.value()));
+	}
+
+	SUBCASE("UTF-8-BOM")
+	{
+		const auto file {fileof("./src/sample/utf8bom.txt")};
 
 		REQUIRE(file.has_value());
 

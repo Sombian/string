@@ -1,8 +1,11 @@
+# Sombian/string
+
 [![hits](https://hits.sh/github.com/Sombian/string.svg)]()
 [![test](https://badgen.net/github/stars/Sombian/string)]()
 [![test](https://badgen.net/github/forks/Sombian/string)]()
 
-requires **C++23** ot later.
+a header only string impl. requires **C++23** ot later.  
+(incompatible with MSVC for its lack of C++23 supports.)  
 
 ```c++
 #include "string.hpp"
@@ -16,6 +19,39 @@ int main() noexcept
 	assert(str == str[0, N]);
 
 	std::cout << str << '\n';
+}
+```
+
+### DISCLAIMER
+
+code point random accessing is O(N) for variable width encoding.  
+for this reason using an iterator is recommended for linear traversal.  
+
+**Bad**
+
+```c++
+utf8 str {u8"hello world"};
+
+// time complexity: O(N)
+const auto len {str.length()};
+
+// time complexity: O(N^2)
+for (size_t i {0}; i < len; ++i)
+{
+    const auto code {str[i]};
+    // ...do something with it
+}
+```
+
+**Good**
+
+```c++
+utf8 str {u8"hello world"};
+
+// time complexity: O(N)
+for (const auto code : str)
+{
+    // ...do something with it
 }
 ```
 

@@ -2,10 +2,6 @@ cmake_minimum_required(VERSION 3.10)
 
 project(main LANGUAGES C CXX)
 
-#--------------#
-# C++ settings #
-#--------------#
-
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,10 +12,13 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 	add_link_options("-fuse-ld=bfd")
+	add_compile_options(-Wall -Wextra -Wpedantic -Wold-style-cast)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 	add_link_options("-fuse-ld=lld")
+	add_compile_options(-Wall -Wextra -Wpedantic -Wold-style-cast)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 	add_link_options("-fuse-ld=link")
+	add_compile_options(/Wall /sdl /permissive- /fsanitize /utf-8)
 endif()
 
 # main entry point...
@@ -48,9 +47,3 @@ set_target_properties(main PROPERTIES
 	VS_GLOBAL_EnableClangTidyCodeAnalysis true
 	DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
-
-if (MSVC)
-	add_compile_options(/Wall /sdl /permissive- /fsanitize /utf-8)
-else()
-	add_compile_options(-Wall -Wextra -Wpedantic -Wold-style-cast)
-endif()
