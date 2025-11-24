@@ -1267,8 +1267,12 @@ constexpr auto c_str<T, A>::__split__(const T* lhs_0, const T* lhs_N,
 		const auto lhs_L {__size__(lhs_0, lhs_N)};
 		const auto rhs_L {__size__(rhs_0, rhs_N)};
 
+		if (rhs_L == 0 || lhs_L < rhs_L) return out;
+
 		// longest proper suffix for KMP search
-		size_t* const lps {new size_t[rhs_L](0)};
+		size_t* const lps {new size_t[rhs_L]};
+
+		lps[0] = 0;
 
 		for (size_t i {1}, j {0}; i < rhs_L; ++i)
 		{
@@ -1276,10 +1280,7 @@ constexpr auto c_str<T, A>::__split__(const T* lhs_0, const T* lhs_N,
 			{
 				j = lps[j - 1];
 			}
-			/* equal */ if (rhs_0[i] == rhs_0[j])
-			{
-				lps[i] = ++j;
-			}
+			lps[i] = rhs_0[i] == rhs_0[j] ? ++j : 0;
 		}
 		// for segmment
 		size_t off_I {0};
@@ -1296,13 +1297,7 @@ constexpr auto c_str<T, A>::__split__(const T* lhs_0, const T* lhs_N,
 
 				if (j == rhs_L)
 				{
-					const auto end_I {i - rhs_L};
-
-					out.emplace_back
-					(
-						&lhs_0[off_I],
-						&lhs_0[end_I]
-					);
+					out.emplace_back(&lhs_0[off_I], &lhs_0[i - rhs_L]);
 
 					j = lps[j - 1];
 
@@ -1381,8 +1376,12 @@ constexpr auto c_str<T, A>::__match__(const T* lhs_0, const T* lhs_N,
 		const auto lhs_L {__size__(lhs_0, lhs_N)};
 		const auto rhs_L {__size__(rhs_0, rhs_N)};
 
+		if (rhs_L == 0 || lhs_L < rhs_L) return out;
+
 		// longest proper suffix for KMP search
-		size_t* const lps {new size_t[rhs_L](0)};
+		size_t* const lps {new size_t[rhs_L]};
+
+		lps[0] = 0;
 
 		for (size_t i {1}, j {0}; i < rhs_L; ++i)
 		{
@@ -1390,10 +1389,7 @@ constexpr auto c_str<T, A>::__match__(const T* lhs_0, const T* lhs_N,
 			{
 				j = lps[j - 1];
 			}
-			/* equal */ if (rhs_0[i] == rhs_0[j])
-			{
-				lps[i] = ++j;
-			}
+			lps[i] = rhs_0[i] == rhs_0[j] ? ++j : 0;
 		}
 
 		for (size_t i {0}, j {0}; i < lhs_L; ++i)
@@ -1408,13 +1404,7 @@ constexpr auto c_str<T, A>::__match__(const T* lhs_0, const T* lhs_N,
 
 				if (j == rhs_L)
 				{
-					const auto l {i - rhs_L + 1};
-
-					out.emplace_back
-					(
-						&lhs_0[l],
-						&lhs_0[i]
-					);
+					out.emplace_back(&lhs_0[i - rhs_L + 1], &lhs_0[i]);
 
 					j = lps[j - 1];
 				}

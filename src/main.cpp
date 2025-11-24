@@ -18,7 +18,7 @@ TEST_CASE("storage")
 
 TEST_CASE("[API] string")
 {
-	SUBCASE("concat")
+	SUBCASE("concatenation")
 	{
 		const utf8 foo {u8"티라"};
 		const utf8 bar {u8"미수"};
@@ -33,7 +33,7 @@ TEST_CASE("[API] string")
 		CHECK(foo_bar.length() == 4);
 	}
 
-	SUBCASE("substr")
+	SUBCASE("split & match")
 	{
 		const utf8 str {u8"티라미수"
 		                u8"☆"
@@ -43,12 +43,18 @@ TEST_CASE("[API] string")
 		                u8"☆"
 		                u8"딸기우유"};
 
-		auto src {str.split(u"☆")};
+		auto split {str.split(u8"☆")};
 
-		CHECK(src[0] == u"티라미수");
-		CHECK(src[1] == u"치즈케잌");
-		CHECK(src[2] == u"말차라떼");
-		CHECK(src[3] == u"딸기우유");
+		CHECK(split[0] == u"티라미수");
+		CHECK(split[1] == u"치즈케잌");
+		CHECK(split[2] == u"말차라떼");
+		CHECK(split[3] == u"딸기우유");
+
+		auto match {str.match(u8"☆")};
+
+		CHECK(match[0] == u"☆");
+		CHECK(match[1] == u"☆");
+		CHECK(match[2] == u"☆");
 	}
 }
 

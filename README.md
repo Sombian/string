@@ -36,10 +36,11 @@ utf8 str {u8"hello world"};
 const auto len {str.length()};
 
 // time complexity: O(N^2)
-for (size_t i {0}; i < len; ++i)
+for (int i {0}; i < len; ++i)
 {
-    const auto code {str[i]};
-    // ...do something with it
+	// time complexity: O(N)
+	const auto code {str[i]};
+	// do something with it
 }
 ```
 
@@ -51,7 +52,7 @@ utf8 str {u8"hello world"};
 // time complexity: O(N)
 for (const auto code : str)
 {
-    // ...do something with it
+	// do something with it
 }
 ```
 
