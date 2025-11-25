@@ -82,7 +82,7 @@ for (const auto code : str)
 	- (getter)
 	- returns a list of string `slice`, of which are product of search occurrence.
 
-- starts_width
+- starts_with
 	- (getter)
 	- *self explanatory* returns whether or not it starts with *parameter*.
 
@@ -116,7 +116,7 @@ for (const auto code : str)
 	- (getter)
 	- returns a list of string `slice`, of which are product of search occurrence.
 
-- starts_width
+- starts_with
 	- (getter)
 	- *self explanatory* returns whether or not it starts with *parameter*.
 

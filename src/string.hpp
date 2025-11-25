@@ -1282,7 +1282,7 @@ constexpr auto c_str<T, A>::__split__(const T* lhs_0, const T* lhs_N,
 			}
 			lps[i] = rhs_0[i] == rhs_0[j] ? ++j : 0;
 		}
-		// for segmment
+
 		size_t off_I {0};
 
 		for (size_t i {0}, j {0}; i < lhs_L; ++i)

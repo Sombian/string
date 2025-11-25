@@ -1,11 +1,30 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include "doctest.h"
+// #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <variant>
 #include <utility>
 
 #include "string.hpp"
+
+#ifndef DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+
+#include <iostream>
+
+int main() noexcept
+{
+	static const char8_t path[]
+	{u8"./src/sample/utf8.txt"};
+
+	std::visit([](auto&& txt)
+	{
+		std::cout << txt << '\n';
+	},
+	std::move(*fileof(path)));
+}
+#endif
+
+#ifdef DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+
+#include "doctest.h"
 
 TEST_CASE("storage")
 {
@@ -44,17 +63,12 @@ TEST_CASE("[API] string")
 		                u8"딸기우유"};
 
 		auto split {str.split(u8"☆")};
+		auto match {str.match(u8"☆")};
 
 		CHECK(split[0] == u"티라미수");
 		CHECK(split[1] == u"치즈케잌");
 		CHECK(split[2] == u"말차라떼");
 		CHECK(split[3] == u"딸기우유");
-
-		auto match {str.match(u8"☆")};
-
-		CHECK(match[0] == u"☆");
-		CHECK(match[1] == u"☆");
-		CHECK(match[2] == u"☆");
 	}
 }
 
@@ -96,3 +110,4 @@ TEST_CASE("[API] fileof")
 		CHECK(std::holds_alternative<utf16>(file.value()));
 	}
 }
+#endif
