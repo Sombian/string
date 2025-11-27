@@ -11,6 +11,10 @@
 
 int main() noexcept
 {
+	#ifdef _MSC_VER//############//;
+	std::system("chcp 65001 > NUL");
+	#endif//MSC_VER//############//;
+
 	static const char8_t path[]
 	{u8"./src/sample/utf8.txt"};
 

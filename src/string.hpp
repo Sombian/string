@@ -1297,6 +1297,7 @@ constexpr auto c_str<T, A>::__split__(const T* lhs_0, const T* lhs_N,
 
 				if (j == rhs_L)
 				{
+					// ...segment portion
 					out.emplace_back(&lhs_0[off_I], &lhs_0[i - rhs_L]);
 
 					j = lps[j - 1];
@@ -1308,10 +1309,12 @@ constexpr auto c_str<T, A>::__split__(const T* lhs_0, const T* lhs_N,
 
 		if (off_I < lhs_L)
 		{
+			// ...remaining portion
 			out.emplace_back(&lhs_0[off_I], &lhs_0[lhs_L - 1]);
 		}
 		if (off_I == lhs_L)
 		{
+			// ...remaining portion
 			out.emplace_back(&lhs_0[lhs_L], &lhs_0[lhs_L - 1]);
 		}
 
@@ -1404,6 +1407,7 @@ constexpr auto c_str<T, A>::__match__(const T* lhs_0, const T* lhs_N,
 
 				if (j == rhs_L)
 				{
+					// ..identical portion
 					out.emplace_back(&lhs_0[i - rhs_L + 1], &lhs_0[i]);
 
 					j = lps[j - 1];

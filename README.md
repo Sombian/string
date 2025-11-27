@@ -1,10 +1,10 @@
 # Sombian/string
 
 [![hits](https://hits.sh/github.com/Sombian/string.svg)]()
-[![test](https://badgen.net/github/stars/Sombian/string)]()
-[![test](https://badgen.net/github/forks/Sombian/string)]()
+[![stats](https://badgen.net/github/stars/Sombian/string)]()
+[![stats](https://badgen.net/github/forks/Sombian/string)]()
 
-a header only string impl. requires **C++23** ot later.  
+a header only string impl. requires **C++23** or later.  
 (incompatible with MSVC for its lack of C++23 supports.)  
 
 ```c++

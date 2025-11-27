@@ -10,7 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 	add_link_options("-fuse-ld=bfd")
 	add_compile_options(-Wall -Wextra -Wpedantic -Wold-style-cast)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
