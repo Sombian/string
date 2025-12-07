@@ -274,31 +274,31 @@ class c_str
 		constexpr auto operator[](size_t start, size_t until) const noexcept -> slice;
 	};
 
-	// typeof(lhs) == typeof(rhs)
+	// constraint: where typeof(lhs) == typeof(rhs)
 	static constexpr auto _size(const T* head, const T* tail) noexcept -> size_t;
 	template <unit_t U> requires (!std::is_same_v<T, U>)
 	static constexpr auto _size(const U* head, const U* tail) noexcept -> size_t;
 
-	// typeof(lhs) == typeof(rhs)
+	// constraint: where typeof(lhs) == typeof(rhs)
 	static constexpr auto _length(const T* head, const T* tail) noexcept -> size_t;
 	template <unit_t U> requires (!std::is_same_v<T, U>)
 	static constexpr auto _length(const U* head, const U* tail) noexcept -> size_t;
 
-	// typeof(lhs) == typeof(rhs)
+	// constraint: where typeof(lhs) == typeof(rhs)
 	static constexpr auto _fcopy(const T* head, const T* tail,
 	                                            /*&*/ T* dest) noexcept -> void;
 	template <unit_t U> requires (!std::is_same_v<T, U>)
 	static constexpr auto _fcopy(const U* head, const U* tail,
 	                                            /*&*/ T* dest) noexcept -> void;
 
-	// typeof(lhs) == typeof(rhs)
+	// constraint: where typeof(lhs) == typeof(rhs)
 	static constexpr auto _rcopy(const T* head, const T* tail,
 	                                            /*&*/ T* dest) noexcept -> void;
 	template <unit_t U> requires (!std::is_same_v<T, U>)
 	static constexpr auto _rcopy(const U* head, const U* tail,
 	                                            /*&*/ T* dest) noexcept -> void;
 
-	// [typeof(lhs) == typeof(rhs)]
+	// constraint: where typeof(lhs) == typeof(rhs)
 	static constexpr auto _equal(const T* lhs_0, const T* lhs_N,
 	                             const T* rhs_0, const T* rhs_N) noexcept -> bool;
 	template <unit_t U> requires (!std::is_same_v<T, U>)
@@ -308,7 +308,7 @@ class c_str
 	static constexpr auto _equal(const U* lhs_0, const U* lhs_N,
 	                             const T* rhs_0, const T* rhs_N) noexcept -> bool;
 
-	// [typeof(lhs) == typeof(rhs)]
+	// constraint: where typeof(lhs) == typeof(rhs)
 	static constexpr auto _nqual(const T* lhs_0, const T* lhs_N,
 	                             const T* rhs_0, const T* rhs_N) noexcept -> bool;
 	template <unit_t U> requires (!std::is_same_v<T, U>)
@@ -318,7 +318,21 @@ class c_str
 	static constexpr auto _nqual(const U* lhs_0, const U* lhs_N,
 	                             const T* rhs_0, const T* rhs_N) noexcept -> bool;
 
-	// [typeof(lhs) == typeof(rhs)]
+	// constraint: where typeof(lhs) == typeof(rhs)
+	static constexpr auto _equal(c_str &  lhs_0,
+	                             const T* rhs_0, const T* rhs_N) noexcept -> void;
+	template <unit_t U> requires (!std::is_same_v<T, U>)
+	static constexpr auto _equal(c_str &  lhs_0,
+	                             const U* rhs_0, const U* rhs_N) noexcept -> void;
+
+	// constraint: where typeof(lhs) == typeof(rhs)
+	static constexpr auto _pqual(c_str &  lhs_0,
+	                             const T* rhs_0, const T* rhs_N) noexcept -> void;
+	template <unit_t U> requires (!std::is_same_v<T, U>)
+	static constexpr auto _pqual(c_str &  lhs_0,
+	                             const U* rhs_0, const U* rhs_N) noexcept -> void;
+
+	// constraint: where typeof(lhs) == typeof(rhs)
 	static constexpr auto _cplus(const T* lhs_0, const T* lhs_N,
 	                             const T* rhs_0, const T* rhs_N) noexcept -> c_str;
 	template <unit_t U> requires (!std::is_same_v<T, U>)
@@ -328,14 +342,14 @@ class c_str
 	static constexpr auto _cplus(const U* lhs_0, const U* lhs_N,
 	                             const T* rhs_0, const T* rhs_N) noexcept -> c_str;
 
-	// [typeof(lhs) == typeof(rhs)]
+	// constraint: where typeof(lhs) == typeof(rhs)
 	static constexpr auto _split(const T* lhs_0, const T* lhs_N,
 	                             const T* rhs_0, const T* rhs_N) noexcept -> std::vector<slice>;
 	template <unit_t U> requires (!std::is_same_v<T, U>)
 	static constexpr auto _split(const T* lhs_0, const T* lhs_N,
 	                             const U* rhs_0, const U* rhs_N) noexcept -> std::vector<slice>;
 
-	// [typeof(lhs) == typeof(rhs)]
+	// constraint: where typeof(lhs) == typeof(rhs)
 	static constexpr auto _match(const T* lhs_0, const T* lhs_N,
 	                             const T* rhs_0, const T* rhs_N) noexcept -> std::vector<slice>;
 	template <unit_t U> requires (!std::is_same_v<T, U>)
@@ -671,23 +685,7 @@ public:
 	template <unit_t U, allo_t B>
 	constexpr auto operator=(const c_str<U, B> /*&*/ & rhs) noexcept -> c_str&
 	{
-		const U* rhs_0 {rhs.head()};
-		const U* rhs_N {rhs.tail()};
-
-		const auto size {_size(rhs_0, rhs_N)};
-
-		// fix overflow
-		this->capacity(size);
-
-		_fcopy
-		(
-			rhs_0, // U*
-			rhs_N, // U*
-			this->head()
-		);
-
-		// fix invariant
-		this->__size__(size);
+		_equal(*this, rhs.head(), rhs.tail());
 		
 		return *this;
 	}
@@ -695,23 +693,7 @@ public:
 	template <unit_t U, allo_t B>
 	constexpr auto operator=(const c_str<U, B>::slice& rhs) noexcept -> c_str&
 	{
-		const U* rhs_0 {rhs.head};
-		const U* rhs_N {rhs.tail};
-
-		const auto size {_size(rhs_0, rhs_N)};
-
-		// fix overflow
-		this->capacity(size);
-
-		_fcopy
-		(
-			rhs_0, // U*
-			rhs_N, // U*
-			this->head()
-		);
-
-		// fix invariant
-		this->__size__(size);
+		_equal(*this, rhs.head, rhs.tail);
 		
 		return *this;
 	}
@@ -719,23 +701,7 @@ public:
 	template <unit_t U, size_t N>
 	constexpr auto operator=(const U /*literal*/ (&rhs)[N]) noexcept -> c_str&
 	{
-		const U* rhs_0 {&rhs[0x0]};
-		const U* rhs_N {&rhs[N-1]};
-
-		const auto size {_size(rhs_0, rhs_N)};
-
-		// fix overflow
-		this->capacity(size);
-
-		_fcopy
-		(
-			rhs_0, // U*
-			rhs_N, // U*
-			this->head()
-		);
-
-		// fix invariant
-		this->__size__(size);
+		_equal(*this, &rhs[0x0], &rhs[N-1]);
 
 		return *this;
 	}
@@ -745,23 +711,7 @@ public:
 	template <unit_t U, allo_t B>
 	constexpr auto operator+=(const c_str<U, B> /*&*/ & rhs) noexcept -> c_str&
 	{
-		const U* rhs_0 {rhs.head()};
-		const U* rhs_N {rhs.tail()};
-
-		const auto size {this->size() + _size(rhs_0, rhs_N)};
-
-		// fix overflow
-		this->capacity(size);
-
-		_fcopy
-		(
-			rhs_0, // U*
-			rhs_N, // U*
-			this->tail()
-		);
-
-		// fix invariant
-		this->__size__(size);
+		_pqual(*this, rhs.head(), rhs.tail());
 
 		return *this;
 	}
@@ -769,23 +719,7 @@ public:
 	template <unit_t U, allo_t B>
 	constexpr auto operator+=(const c_str<U, B>::slice& rhs) noexcept -> c_str&
 	{
-		const U* rhs_0 {rhs.head};
-		const U* rhs_N {rhs.tail};
-
-		const auto size {this->size() + _size(rhs_0, rhs_N)};
-
-		// fix overflow
-		this->capacity(size);
-
-		_fcopy
-		(
-			rhs_0, // U*
-			rhs_N, // U*
-			this->tail()
-		);
-
-		// fix invariant
-		this->__size__(size);
+		_pqual(*this, rhs.head, rhs.tail);
 
 		return *this;
 	}
@@ -793,23 +727,7 @@ public:
 	template <unit_t U, size_t N>
 	constexpr auto operator+=(const U /*literal*/ (&rhs)[N]) noexcept -> c_str&
 	{
-		const U* rhs_0 {&rhs[0x0]};
-		const U* rhs_N {&rhs[N-1]};
-
-		const auto size {this->size() + _size(rhs_0, rhs_N)};
-
-		// fix overflow
-		this->capacity(size);
-
-		_fcopy
-		(
-			rhs_0, // U*
-			rhs_N, // U*
-			this->tail()
-		);
-
-		// fix invariant
-		this->__size__(size);
+		_pqual(*this, &rhs[0x0], &rhs[N-1]);
 
 		return *this;
 	}
@@ -1399,6 +1317,94 @@ constexpr auto c_str<T, A>::_nqual(const T* lhs_0, const T* lhs_N,
 }
 
 template <unit_t T, allo_t A>
+                            // [typeof(lhs) == typeof(rhs)]
+//────────────୨ৎ────────────//
+constexpr auto c_str<T, A>::_equal(c_str &  lhs_0,
+                                   const T* rhs_0, const T* rhs_N) noexcept -> void
+{
+	const auto sum {_size(rhs_0, rhs_N)};
+
+	// fix overflow
+	lhs_0.capacity(sum);
+
+	_fcopy
+	(
+		rhs_0, // U*
+		rhs_N, // U*
+		lhs_0.head()
+	);
+
+	// fix invariant
+	lhs_0.__size__(sum);
+}
+
+template <unit_t T, allo_t A>
+template <unit_t U          > requires (!std::is_same_v<T, U>)
+//────────────୨ৎ────────────//
+constexpr auto c_str<T, A>::_equal(c_str &  lhs_0,
+                                   const U* rhs_0, const U* rhs_N) noexcept -> void
+{
+	const auto sum {_size(rhs_0, rhs_N)};
+
+	// fix overflow
+	lhs_0.capacity(sum);
+
+	_fcopy
+	(
+		rhs_0, // U*
+		rhs_N, // U*
+		lhs_0.head()
+	);
+
+	// fix invariant
+	lhs_0.__size__(sum);
+}
+
+template <unit_t T, allo_t A>
+                            // [typeof(lhs) == typeof(rhs)]
+//────────────୨ৎ────────────//
+constexpr auto c_str<T, A>::_pqual(c_str &  lhs_0,
+                                   const T* rhs_0, const T* rhs_N) noexcept -> void
+{
+	const auto sum {lhs_0.size() + _size(rhs_0, rhs_N)};
+
+	// fix overflow
+	lhs_0.capacity(sum);
+
+	_fcopy
+	(
+		rhs_0, // U*
+		rhs_N, // U*
+		lhs_0.tail()
+	);
+
+	// fix invariant
+	lhs_0.__size__(sum);
+}
+
+template <unit_t T, allo_t A>
+template <unit_t U          > requires (!std::is_same_v<T, U>)
+//────────────୨ৎ────────────//
+constexpr auto c_str<T, A>::_pqual(c_str &  lhs_0,
+                                   const U* rhs_0, const U* rhs_N) noexcept -> void
+{
+	const auto sum {lhs_0.size() + _size(rhs_0, rhs_N)};
+
+	// fix overflow
+	lhs_0.capacity(sum);
+
+	_fcopy
+	(
+		rhs_0, // U*
+		rhs_N, // U*
+		lhs_0.tail()
+	);
+
+	// fix invariant
+	lhs_0.__size__(sum);
+}
+
+template <unit_t T, allo_t A>
 template <unit_t U          > requires (!std::is_same_v<T, U>)
 //────────────୨ৎ────────────//
 constexpr auto c_str<T, A>::_nqual(const U* lhs_0, const U* lhs_N,
@@ -1574,12 +1580,7 @@ constexpr auto c_str<T, A>::_split(const T* lhs_0, const T* lhs_N,
 
 			if (j == rhs_L)
 			{
-				// ...segment
-				out.emplace_back
-				(
-					&lhs_0[x            ],
-					&lhs_0[i - rhs_L + 1]
-				);
+				out.emplace_back(&lhs_0[x], &lhs_0[i - rhs_L + 1]);
 
 				j = lps[j - 1];
 
@@ -1590,12 +1591,7 @@ constexpr auto c_str<T, A>::_split(const T* lhs_0, const T* lhs_N,
 
 	if (x < lhs_L)
 	{
-		// ...remaining
-		out.emplace_back
-		(
-			&lhs_0[x    ],
-			&lhs_0[lhs_L]
-		);
+		out.emplace_back(&lhs_0[x], &lhs_0[lhs_L]);
 	}
 	delete[] lps;
 
@@ -1693,12 +1689,7 @@ constexpr auto c_str<T, A>::_match(const T* lhs_0, const T* lhs_N,
 
 			if (j == rhs_L)
 			{
-				// ...identical
-				out.emplace_back
-				(
-					&lhs_0[i - rhs_L + 1],
-					&lhs_0[i            ]
-				);
+				out.emplace_back(&lhs_0[i - rhs_L + 1], &lhs_0[i]);
 
 				j = lps[j - 1];
 			}
@@ -1764,7 +1755,7 @@ constexpr auto c_str<T, A>::_range(const T* head, const T* tail, clamp  start, c
 
 	const T* foo {tail};
 	
-	for (size_t i {  0  }; i < until && head < foo; ++i, foo += codec::back(foo)) {}
+	for (size_t i {0/**/}; i < until && head < foo; ++i, foo += codec::back(foo)) {}
 
 	const T* bar {foo};
 
@@ -1782,7 +1773,7 @@ constexpr auto c_str<T, A>::_range(const T* head, const T* tail, clamp  start, r
 {
 	const T* foo {tail};
 
-	for (size_t i {  0  }; i < start && head < foo; ++i, foo += codec::back(foo)) {}
+	for (size_t i {0/**/}; i < start && head < foo; ++i, foo += codec::back(foo)) {}
 
 	const T* bar {tail};
 
@@ -1798,11 +1789,11 @@ constexpr auto c_str<T, A>::_range(const T* head, const T* tail, size_t start, c
 {
 	const T* foo {head};
 
-	for (size_t i {  0  }; i < start && foo < tail; ++i, foo += codec::next(foo)) {}
+	for (size_t i {0/**/}; i < start && foo < tail; ++i, foo += codec::next(foo)) {}
 
 	const T* bar {tail};
 
-	for (size_t i {  0  }; i < until && head < bar; ++i, bar += codec::back(bar)) {}
+	for (size_t i {0/**/}; i < until && head < bar; ++i, bar += codec::back(bar)) {}
 
 	assert(head <= foo && foo <= tail);
 	assert(head <= bar && bar <= tail);
@@ -1816,7 +1807,7 @@ constexpr auto c_str<T, A>::_range(const T* head, const T* tail, size_t start, r
 {
 	const T* foo {head};
 
-	for (size_t i {  0  }; i < start && foo < tail; ++i, foo += codec::next(foo)) {}
+	for (size_t i {0/**/}; i < start && foo < tail; ++i, foo += codec::next(foo)) {}
 
 	const T* bar {tail};
 
@@ -1834,7 +1825,7 @@ constexpr auto c_str<T, A>::_range(const T* head, const T* tail, size_t start, s
 
 	const T* foo {head};
 
-	for (size_t i {  0  }; i < start && foo < tail; ++i, foo += codec::next(foo)) {}
+	for (size_t i {0/**/}; i < start && foo < tail; ++i, foo += codec::next(foo)) {}
 
 	const T* bar {foo};
 

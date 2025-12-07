@@ -22,9 +22,7 @@ int main() noexcept
 }
 ```
 
-### DISCLAIMER
-
-code point random accessing is O(N) for variable width encoding.  
+code point random accessing is **O(N)** for variable width encoding.  
 for this reason using an iterator is recommended for linear traversal.  
 
 **Bad**
@@ -55,79 +53,3 @@ for (const auto code : str)
 	// do something with it
 }
 ```
-
-### `c_str`
-
-- size
-	- (getter)
-	- returns the number of `code unit`s, excluding NULL-TERMINATOR.
-
-- length
-	- (getter)
-	- returns the number of `code point`s, excluding NULL-TERMINATOR.
-
-- capacity
-	- (getter)
-	- returns the number of `code unit`s it can hold, excluding NULL-TERMINATOR.
-
-- capacity
-	- (setter)
-	- changes the number of `code unit`s it can hold, excluding NULL-TERMINATOR.
-
-- split
-	- (getter)
-	- returns a list of string `slice`, of which are product of split aka division.
-
-- match
-	- (getter)
-	- returns a list of string `slice`, of which are product of search occurrence.
-
-- starts_with
-	- (getter)
-	- *self explanatory* returns whether or not it starts with *parameter*.
-
-- ends_with
-	- (getter)
-	- *self explanatory* returns whether or not it ends with *parameter*.
-
-- contains
-	- (getter)
-	- *self explanatory* returns whether or not it contains *parameter*.
-
-- [A, B]
-	- (getter)
-	- returns a `slice` in range, similar to that of Python's slicing.
-
-### `slice`
-
-- size
-	- (getter)
-	- returns the number of `code unit`s, excluding NULL-TERMINATOR.
-
-- length
-	- (getter)
-	- returns the number of `code point`s, excluding NULL-TERMINATOR.
-
-- split
-	- (getter)
-	- returns a list of string `slice`, of which are product of split aka division.
-
-- match
-	- (getter)
-	- returns a list of string `slice`, of which are product of search occurrence.
-
-- starts_with
-	- (getter)
-	- *self explanatory* returns whether or not it starts with *parameter*.
-
-- ends_with
-	- (getter)
-	- *self explanatory* returns whether or not it ends with *parameter*.
-
-- contains
-	- (getter)
-	- *self explanatory* returns whether or not it contains *parameter*.
-
-- [A, B]
-	- (getter)
-	- returns a `slice` in range, similar to that of Python's slicing.
