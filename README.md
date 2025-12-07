@@ -1,9 +1,9 @@
 # Sombian/string
 
 [![wiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Sombian/string)
-[![hits](https://hits.sh/github.com/Sombian/string.svg)](https://hits.sh/github.com/Sombian)
-[![stats](https://badgen.net/github/stars/Sombian/string)](https://hits.sh/github.com/Sombian)
-[![stats](https://badgen.net/github/forks/Sombian/string)](https://hits.sh/github.com/Sombian)
+[![hits](https://hits.sh/github.com/Sombian/string.svg)](https://github.com/Sombian/string)
+[![stats](https://badgen.net/github/stars/Sombian/string)](https://github.com/Sombian/string)
+[![stats](https://badgen.net/github/forks/Sombian/string)](https://github.com/Sombian/string)
 
 a header only string impl. requires **C++23** or later.  
 (incompatible with MSVC for its lack of C++23 supports.)  
