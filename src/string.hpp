@@ -1951,34 +1951,52 @@ constexpr auto c_str<T, A>::codec::encode_ptr(const char32_t in, T* out, int8_t 
 	{
 		switch (size)
 		{
-			case 1:
+			case +1:
+			case -1:
 			{
 				out[0] = static_cast<T>(in);
-
 				break;
 			}
-			case 2:
+			case +2:
 			{
-				out[0] = 0xC0 | ((in >> 06) & 0x1F);
-				out[1] = 0x80 | ((in >> 00) & 0x3F);
-
+				out[+0] = 0xC0 | ((in >> 06) & 0x1F);
+				out[+1] = 0x80 | ((in >> 00) & 0x3F);
 				break;
 			}
-			case 3:
+			case -2:
+			{
+				out[-1] = 0xC0 | ((in >> 06) & 0x1F);
+				out[-0] = 0x80 | ((in >> 00) & 0x3F);
+				break;
+			}
+			case +3:
 			{
 				out[0] = 0xE0 | ((in >> 12) & 0x0F);
 				out[1] = 0x80 | ((in >> 06) & 0x3F);
 				out[2] = 0x80 | ((in >> 00) & 0x3F);
-
 				break;
 			}
-			case 4:
+			case -3:
 			{
-				out[0] = 0xF0 | ((in >> 18) & 0x07);
-				out[1] = 0x80 | ((in >> 12) & 0x3F);
-				out[2] = 0x80 | ((in >> 06) & 0x3F);
-				out[3] = 0x80 | ((in >> 00) & 0x3F);
-
+				out[-2] = 0xE0 | ((in >> 12) & 0x0F);
+				out[-1] = 0x80 | ((in >> 06) & 0x3F);
+				out[-0] = 0x80 | ((in >> 00) & 0x3F);
+				break;
+			}
+			case +4:
+			{
+				out[+0] = 0xF0 | ((in >> 18) & 0x07);
+				out[+1] = 0x80 | ((in >> 12) & 0x3F);
+				out[+2] = 0x80 | ((in >> 06) & 0x3F);
+				out[+3] = 0x80 | ((in >> 00) & 0x3F);
+				break;
+			}
+			case -4:
+			{
+				out[-3] = 0xF0 | ((in >> 18) & 0x07);
+				out[-2] = 0x80 | ((in >> 12) & 0x3F);
+				out[-1] = 0x80 | ((in >> 06) & 0x3F);
+				out[-0] = 0x80 | ((in >> 00) & 0x3F);
 				break;
 			}
 		}
@@ -1987,19 +2005,24 @@ constexpr auto c_str<T, A>::codec::encode_ptr(const char32_t in, T* out, int8_t 
 	{
 		switch (size)
 		{
-			case 1:
+			case +1:
+			case -1:
 			{
 				out[0] = static_cast<T>(in);
-
 				break;
 			}
-			case 2:
+			case +2:
 			{
-				const auto code {in - 0x10000};
-
-				out[0] = 0xD800 | (code / 0x400);
-				out[1] = 0xDC00 | (code & 0x3FF);
-
+				const char32_t code {in - 0x10000};
+				out[+0] = 0xD800 | (code / 0x400);
+				out[+1] = 0xDC00 | (code & 0x3FF);
+				break;
+			}
+			case -2:
+			{
+				const char32_t code {in - 0x10000};
+				out[-1] = 0xD800 | (code / 0x400);
+				out[-0] = 0xDC00 | (code & 0x3FF);
 				break;
 			}
 		}
@@ -2022,40 +2045,64 @@ constexpr auto c_str<T, A>::codec::decode_ptr(const T* in, char32_t& out, int8_t
 	{
 		switch (size)
 		{
-			case 1:
+			case +1:
+			case -1:
 			{
 				out = static_cast<char32_t>(in[0]);
-
 				break;
 			}
-			case 2:
+			case +2:
 			{
-				out = ((in[0] & 0x1F) << 06)
+				out = ((in[+0] & 0x1F) << 06)
 				      |
-				      ((in[1] & 0x3F) << 00);
-
+				      ((in[+1] & 0x3F) << 00);
 				break;
 			}
-			case 3:
+			case -2:
 			{
-				out = ((in[0] & 0x0F) << 12)
+				out = ((in[-1] & 0x1F) << 06)
 				      |
-				      ((in[1] & 0x3F) << 06)
-				      |
-				      ((in[2] & 0x3F) << 00);
-
+				      ((in[-0] & 0x3F) << 00);
 				break;
 			}
-			case 4:
+			case +3:
 			{
-				out = ((in[0] & 0x07) << 18)
+				out = ((in[+0] & 0x0F) << 12)
 				      |
-				      ((in[1] & 0x3F) << 12)
+				      ((in[+1] & 0x3F) << 06)
 				      |
-				      ((in[2] & 0x3F) << 06)
+				      ((in[+2] & 0x3F) << 00);
+				break;
+			}
+			case -3:
+			{
+				out = ((in[-2] & 0x0F) << 12)
 				      |
-				      ((in[3] & 0x3F) << 00);
-
+				      ((in[-1] & 0x3F) << 06)
+				      |
+				      ((in[-0] & 0x3F) << 00);
+				break;
+			}
+			case +4:
+			{
+				out = ((in[+0] & 0x07) << 18)
+				      |
+				      ((in[+1] & 0x3F) << 12)
+				      |
+				      ((in[+2] & 0x3F) << 06)
+				      |
+				      ((in[+3] & 0x3F) << 00);
+				break;
+			}
+			case -4:
+			{
+				out = ((in[-3] & 0x07) << 18)
+				      |
+				      ((in[-2] & 0x3F) << 12)
+				      |
+				      ((in[-1] & 0x3F) << 06)
+				      |
+				      ((in[-0] & 0x3F) << 00);
 				break;
 			}
 		}
@@ -2064,20 +2111,28 @@ constexpr auto c_str<T, A>::codec::decode_ptr(const T* in, char32_t& out, int8_t
 	{
 		switch (size)
 		{
-			case 1:
+			case +1:
+			case -1:
 			{
 				out = static_cast<char32_t>(in[0]);
-
 				break;
 			}
-			case 2:
+			case +2:
 			{
 				out = 0x10000 // supplymentary
 				      |
-				      ((in[0] - 0xD800) << 10)
+				      ((in[+0] - 0xD800) << 10)
 				      |
-				      ((in[1] - 0xDC00) << 00);
-
+				      ((in[+1] - 0xDC00) << 00);
+				break;
+			}
+			case -2:
+			{
+				out = 0x10000 // supplymentary
+				      |
+				      ((in[-1] - 0xD800) << 10)
+				      |
+				      ((in[-0] - 0xDC00) << 00);
 				break;
 			}
 		}
