@@ -1,5 +1,6 @@
 # Sombian/string
 
+[![wiki](https://deepwiki.com/badge.svg)]()
 [![hits](https://hits.sh/github.com/Sombian/string.svg)]()
 [![stats](https://badgen.net/github/stars/Sombian/string)]()
 [![stats](https://badgen.net/github/forks/Sombian/string)]()
