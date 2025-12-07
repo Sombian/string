@@ -1306,14 +1306,14 @@ constexpr auto c_str<T, A>::_nqual(const T* lhs_0, const T* lhs_N,
 		c_str<T>::codec::decode_ptr(foo, T_out, T_size);
 		c_str<U>::codec::decode_ptr(bar, U_out, U_size);
 
-		if (T_out == U_out)
+		if (T_out != U_out)
 		{
-			return false;
+			return true;
 		}
 		foo += T_size;
 		bar += U_size;
 	}
-	return true;
+	return false;
 }
 
 template <unit_t T, allo_t A>
