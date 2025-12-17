@@ -12,6 +12,7 @@
 #include <fstream>
 #include <optional>
 #include <concepts>
+#include <iterator>
 #include <algorithm>
 #include <filesystem>
 
@@ -127,6 +128,13 @@ class c_str
 		const T* ptr;
 
 	public:
+
+		using iterator_category = std::bidirectional_iterator_tag;
+		// for STL algorithms; itrator trait
+		using difference_type = ptrdiff_t;
+		using value_type = char32_t;
+		using reference = char32_t&;
+		using pointer = const T*;
 
 		cursor(decltype(ptr) ptr) : ptr(ptr) {}
 
@@ -1593,8 +1601,8 @@ constexpr auto c_str<T, A>::_split(const T* lhs_0, const T* lhs_N,
 	{
 		out.emplace_back(&lhs_0[x], &lhs_0[lhs_L]);
 	}
-	delete[] lps;
 
+	delete[] lps;
 	return out;
 }
 
@@ -1695,8 +1703,8 @@ constexpr auto c_str<T, A>::_match(const T* lhs_0, const T* lhs_N,
 			}
 		}
 	}
-	delete[] lps;
 
+	delete[] lps;
 	return out;
 }
 
@@ -3080,7 +3088,7 @@ auto fileof(const STRING& path) noexcept -> std::optional<std::variant<c_str<cha
 
 	static const auto write_as_native
 	{
-		[]<class T>(std::ifstream& ifs, c_str<T>& str) noexcept -> void
+		[]<unit_t T, allo_t A>(std::ifstream& ifs, c_str<T, A>& str) noexcept -> void
 		{
 			T buffer;
 
@@ -3105,7 +3113,7 @@ auto fileof(const STRING& path) noexcept -> std::optional<std::variant<c_str<cha
 
 	static const auto write_as_foreign
 	{
-		[]<class T>(std::ifstream& ifs, c_str<T>& str) noexcept -> void
+		[]<unit_t T, allo_t A>(std::ifstream& ifs, c_str<T, A>& str) noexcept -> void
 		{
 			T buffer;
 
@@ -3135,23 +3143,23 @@ auto fileof(const STRING& path) noexcept -> std::optional<std::variant<c_str<cha
 			using file_t = decltype(fs);
 			using string = std::string;
 
-			// constructible on the fly - great news!
+			// constructible on the fly
 			if constexpr (std::is_constructible_v<file_t, STRING>)
 			{
 				return path;
 			}
-			// at least convertible to file_t! - SFINAE
+			// at least convertible to file_t!
 			else if constexpr (std::is_convertible_v<STRING, file_t>)
 			{
 				return static_cast<file_t>(path);
 			}
-			// at least convertible to string! - SFINAE
+			// at least convertible to string!
 			else if constexpr (std::is_convertible_v<STRING, string>)
 			{
 				return static_cast<string>(path);
 			}
-			// ...SFINAE failuare! you cannot construct!
-			else static_assert(!"SFINAE failure! cannot construct!");
+			// ...constexpr failuare! DEAD-END!
+			else static_assert(!"ERROR! call to 'fileof' is ambigious");
 		}()
 	};
 
