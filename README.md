@@ -26,7 +26,19 @@ int main() noexcept
 code point random accessing is **O(N)** for variable width encoding.  
 for this reason using an iterator is recommended for linear traversal.  
 
-**Bad**
+### ✔️ O(N)
+
+```c++
+utf8 str {u8"hello world"};
+
+// time complexity: O(N)
+for (const auto code : str)
+{
+	// do something with it
+}
+```
+
+### ❌ O(N^2)
 
 ```c++
 utf8 str {u8"hello world"};
@@ -39,18 +51,6 @@ for (int i {0}; i < len; ++i)
 {
 	// time complexity: O(N)
 	const auto code {str[i]};
-	// do something with it
-}
-```
-
-**Good**
-
-```c++
-utf8 str {u8"hello world"};
-
-// time complexity: O(N)
-for (const auto code : str)
-{
 	// do something with it
 }
 ```

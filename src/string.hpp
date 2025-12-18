@@ -12,7 +12,6 @@
 #include <fstream>
 #include <optional>
 #include <concepts>
-#include <iterator>
 #include <algorithm>
 #include <filesystem>
 
@@ -128,13 +127,6 @@ class c_str
 		const T* ptr;
 
 	public:
-
-		using iterator_category = std::bidirectional_iterator_tag;
-		// for STL algorithms; itrator trait
-		using difference_type = ptrdiff_t;
-		using value_type = char32_t;
-		using reference = char32_t&;
-		using pointer = const T*;
 
 		cursor(decltype(ptr) ptr) : ptr(ptr) {}
 
