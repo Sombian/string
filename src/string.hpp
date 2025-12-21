@@ -119,59 +119,6 @@ class c_str
 		LARGE = IS_BIG ? 0b0000000'1 : 0b1'0000000,
 	};
 
-	class cursor
-	{
-		friend c_str;
-
-		const T* ptr;
-
-	public:
-
-		cursor(decltype(ptr) ptr) : ptr(ptr) {}
-
-		constexpr auto operator*() noexcept -> char32_t;
-		constexpr auto operator&() noexcept -> const T*;
-
-		constexpr auto operator++(   ) noexcept -> cursor&;
-		constexpr auto operator++(int) noexcept -> cursor;
-
-		constexpr auto operator--(   ) noexcept -> cursor&;
-		constexpr auto operator--(int) noexcept -> cursor;
-
-		constexpr auto operator==(const cursor& rhs) noexcept -> bool;
-		constexpr auto operator!=(const cursor& rhs) noexcept -> bool;
-	};
-
-	class reader
-	{
-		protected:
-		c_str* src;
-		size_t arg;
-
-	public:
-
-		reader
-		(
-			decltype(src) src,
-			decltype(arg) arg
-		)
-		: src(src), arg(arg) {}
-
-		[[nodiscard]] constexpr operator char32_t() const noexcept;
-
-		constexpr auto operator==(char32_t code) const noexcept -> bool;
-		constexpr auto operator!=(char32_t code) const noexcept -> bool;
-	};
-
-	class writer : public reader
-	{
-		// nothing to do...
-
-	public: using reader::reader;
-
-		constexpr auto operator=(char32_t code) noexcept -> writer&;
-	};
-
 	struct buffer
 	{
 		T* head;
@@ -252,6 +199,61 @@ class c_str
 	static_assert(offsetof(buffer, head) == sizeof(size_t) * 0);
 	static_assert(offsetof(buffer, tail) == sizeof(size_t) * 1);
 
+	class cursor
+	{
+		friend c_str;
+
+		const T* ptr;
+
+	public:
+
+		cursor(decltype(ptr) ptr) : ptr(ptr) {}
+
+		constexpr auto operator*() noexcept -> char32_t;
+		constexpr auto operator&() noexcept -> const T*;
+
+		constexpr auto operator++(   ) noexcept -> cursor&;
+		constexpr auto operator++(int) noexcept -> cursor;
+
+		constexpr auto operator--(   ) noexcept -> cursor&;
+		constexpr auto operator--(int) noexcept -> cursor;
+
+		constexpr auto operator==(const cursor& rhs) noexcept -> bool;
+		constexpr auto operator!=(const cursor& rhs) noexcept -> bool;
+	};
+
+	class reader
+	{
+		protected:
+		c_str* src;
+		size_t arg;
+
+	public:
+
+		reader
+		(
+			decltype(src) src,
+			decltype(arg) arg
+		)
+		: src(src), arg(arg) {}
+
+		[[nodiscard]] constexpr operator char32_t() const noexcept;
+
+		constexpr auto operator==(char32_t code) const noexcept -> bool;
+		constexpr auto operator!=(char32_t code) const noexcept -> bool;
+	};
+
+	class writer : public reader
+	{
+		// nothing to do...
+
+	public:
+	
+		using reader::reader;
+
+		constexpr auto operator=(char32_t code) noexcept -> writer&;
+	};
+
 public:
 
 	// optional; returns the content of a file with CRLF/CR to LF normalization.
@@ -322,9 +324,11 @@ public:
 		{
 			// nothing to do...
 
-		public: using reader::reader;
+		public:
+		
+			using reader::reader;
 
-			constexpr auto operator=(char32_t code) noexcept -> writer&;
+			// constexpr auto operator=(char32_t code) noexcept -> writer&;
 		};
 
 	public:
