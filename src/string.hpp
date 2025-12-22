@@ -99,12 +99,7 @@ inline constexpr auto operator-
 (range, size_t offset) noexcept
 -> clamp { return { offset }; }
 
-template
-<
-	unit_t T = char /* legacy */,
-	allo_t A = std::allocator<T>
->
-class c_str
+template <unit_t T, allo_t A = std::allocator<T>> class c_str
 {
 	#define IS_BIG          \
 	(                       \
@@ -924,6 +919,13 @@ using utf16 = c_str<char16_t>;
 // https://en.wikipedia.org/wiki/UTF-32
 using utf32 = c_str<char32_t>;
 
+// class template argument deduction guides
+
+template <size_t N> c_str(const char (&str)[N]) -> c_str<char>;
+template <size_t N> c_str(const char8_t (&str)[N]) -> c_str<char8_t>;
+template <size_t N> c_str(const char16_t (&str)[N]) -> c_str<char16_t>;
+template <size_t N> c_str(const char32_t (&str)[N]) -> c_str<char32_t>;
+
 #pragma region logic
 
 template <unit_t T, allo_t A>
@@ -1115,18 +1117,18 @@ template <unit_t U          > requires (!std::is_same_v<T, U>)
 constexpr auto c_str<T, A>::_fcopy(const U* head, const U* tail,
                                                   /*&*/ T* dest) noexcept -> void
 {
-	const T* foo {dest};
+	T* str {dest};
 
 	// for (const U* ptr {head}; ptr < tail;)
 	// {
 	// 	char32_t out;
-
+	//
 	// 	const auto U_size {c_str<U>::codec::next(ptr)};
 	// 	c_str<U>::codec::decode_ptr(ptr, out, U_size);
 	// 	const auto T_size {c_str<T>::codec::size(out)};
-
+	//
 	// 	ptr += U_size;
-	// 	foo += T_size;
+	// 	str += T_size;
 	// }
 
 	for (const U* ptr {head}; ptr < tail;)
@@ -1136,10 +1138,10 @@ constexpr auto c_str<T, A>::_fcopy(const U* head, const U* tail,
 		const auto U_size {c_str<U>::codec::next(ptr)};
 		c_str<U>::codec::decode_ptr(ptr, out, U_size);
 		const auto T_size {c_str<T>::codec::size(out)};
-		c_str<T>::codec::encode_ptr(out, ptr, T_size);
+		c_str<T>::codec::encode_ptr(out, str, T_size);
 
 		ptr += U_size;
-		foo += T_size;
+		str += T_size;
 	}
 }
 
@@ -1158,7 +1160,7 @@ template <unit_t U          > requires (!std::is_same_v<T, U>)
 constexpr auto c_str<T, A>::_rcopy(const U* head, const U* tail,
                                                   /*&*/ T* dest) noexcept -> void
 {
-	const T* foo {dest};
+	T* str {dest};
 
 	for (const U* ptr {head}; ptr < tail;)
 	{
@@ -1169,7 +1171,7 @@ constexpr auto c_str<T, A>::_rcopy(const U* head, const U* tail,
 		const auto T_size {c_str<T>::codec::size(out)};
 
 		ptr += U_size;
-		foo += T_size;
+		str += T_size;
 	}
 
 	for (const U* ptr {tail}; head < ptr;)
@@ -1179,10 +1181,10 @@ constexpr auto c_str<T, A>::_rcopy(const U* head, const U* tail,
 		const auto U_size {c_str<U>::codec::back(ptr)};
 		c_str<U>::codec::decode_ptr(ptr, out, U_size);
 		const auto T_size {c_str<T>::codec::size(out)};
-		c_str<T>::codec::encode_ptr(out, ptr, T_size);
+		c_str<T>::codec::encode_ptr(out, str, T_size);
 
 		ptr += U_size;
-		foo += T_size;
+		str += T_size;
 	}
 }
 
@@ -1235,28 +1237,7 @@ template <unit_t U          > requires (!std::is_same_v<T, U>)
 constexpr auto c_str<T, A>::_equal(const U* lhs_0, const U* lhs_N,
                                    const T* rhs_0, const T* rhs_N) noexcept -> bool
 {
-	const T* foo {lhs_0};
-	const U* bar {rhs_0};
-
-	for (; foo < lhs_N && bar < rhs_N;)
-	{
-		char32_t T_out;
-		char32_t U_out;
-
-		const auto T_size {c_str<T>::codec::next(foo)};
-		const auto U_size {c_str<U>::codec::next(bar)};
-
-		c_str<T>::codec::decode_ptr(foo, T_out, T_size);
-		c_str<U>::codec::decode_ptr(bar, U_out, U_size);
-
-		if (T_out != U_out)
-		{
-			return false;
-		}
-		foo += T_size;
-		bar += U_size;
-	}
-	return true;
+	return _equal(rhs_0, rhs_N, lhs_0, lhs_N);
 }
 
 template <unit_t T, allo_t A>
@@ -1303,121 +1284,100 @@ constexpr auto c_str<T, A>::_nqual(const T* lhs_0, const T* lhs_N,
 }
 
 template <unit_t T, allo_t A>
-                            // [typeof(lhs) == typeof(rhs)]
-//────────────୨ৎ────────────//
-constexpr auto c_str<T, A>::_equal(c_str &  lhs_0,
-                                   const T* rhs_0, const T* rhs_N) noexcept -> void
-{
-	const auto sum {_size(rhs_0, rhs_N)};
-
-	// fix overflow
-	lhs_0.capacity(sum);
-
-	_fcopy
-	(
-		rhs_0, // U*
-		rhs_N, // U*
-		lhs_0.head()
-	);
-
-	// fix invariant
-	lhs_0.__size__(sum);
-}
-
-template <unit_t T, allo_t A>
-template <unit_t U          > requires (!std::is_same_v<T, U>)
-//────────────୨ৎ────────────//
-constexpr auto c_str<T, A>::_equal(c_str &  lhs_0,
-                                   const U* rhs_0, const U* rhs_N) noexcept -> void
-{
-	const auto sum {_size(rhs_0, rhs_N)};
-
-	// fix overflow
-	lhs_0.capacity(sum);
-
-	_fcopy
-	(
-		rhs_0, // U*
-		rhs_N, // U*
-		lhs_0.head()
-	);
-
-	// fix invariant
-	lhs_0.__size__(sum);
-}
-
-template <unit_t T, allo_t A>
-                            // [typeof(lhs) == typeof(rhs)]
-//────────────୨ৎ────────────//
-constexpr auto c_str<T, A>::_pqual(c_str &  lhs_0,
-                                   const T* rhs_0, const T* rhs_N) noexcept -> void
-{
-	const auto sum {lhs_0.size() + _size(rhs_0, rhs_N)};
-
-	// fix overflow
-	lhs_0.capacity(sum);
-
-	_fcopy
-	(
-		rhs_0, // U*
-		rhs_N, // U*
-		lhs_0.tail()
-	);
-
-	// fix invariant
-	lhs_0.__size__(sum);
-}
-
-template <unit_t T, allo_t A>
-template <unit_t U          > requires (!std::is_same_v<T, U>)
-//────────────୨ৎ────────────//
-constexpr auto c_str<T, A>::_pqual(c_str &  lhs_0,
-                                   const U* rhs_0, const U* rhs_N) noexcept -> void
-{
-	const auto sum {lhs_0.size() + _size(rhs_0, rhs_N)};
-
-	// fix overflow
-	lhs_0.capacity(sum);
-
-	_fcopy
-	(
-		rhs_0, // U*
-		rhs_N, // U*
-		lhs_0.tail()
-	);
-
-	// fix invariant
-	lhs_0.__size__(sum);
-}
-
-template <unit_t T, allo_t A>
 template <unit_t U          > requires (!std::is_same_v<T, U>)
 //────────────୨ৎ────────────//
 constexpr auto c_str<T, A>::_nqual(const U* lhs_0, const U* lhs_N,
                                    const T* rhs_0, const T* rhs_N) noexcept -> bool
 {
-	const T* foo {lhs_0};
-	const U* bar {rhs_0};
+	return _nqual(rhs_0, rhs_N, lhs_0, lhs_N);
+}
 
-	for (; foo < lhs_N && bar < rhs_N;)
-	{
-		char32_t T_out;
-		char32_t U_out;
+template <unit_t T, allo_t A>
+                            // [typeof(lhs) == typeof(rhs)]
+//────────────୨ৎ────────────//
+constexpr auto c_str<T, A>::_equal(c_str &  lhs_0,
+                                   const T* rhs_0, const T* rhs_N) noexcept -> void
+{
+	const auto sum {_size(rhs_0, rhs_N)};
 
-		const auto T_size {c_str<T>::codec::next(foo)};
-		const auto U_size {c_str<U>::codec::next(bar)};
+	// fix overflow
+	lhs_0.capacity(sum);
 
-		c_str<T>::codec::decode_ptr(foo, T_out, T_size);
-		c_str<U>::codec::decode_ptr(bar, U_out, U_size);
+	_fcopy
+	(
+		rhs_0, // U*
+		rhs_N, // U*
+		lhs_0.head()
+	);
 
-		if (T_out == U_out)
-		{
-			return false;
-		}
-		foo += T_size;
-		bar += U_size;
-	}
-	return true;
+	// fix invariant
+	lhs_0.__size__(sum);
+}
+
+template <unit_t T, allo_t A>
+template <unit_t U          > requires (!std::is_same_v<T, U>)
+//────────────୨ৎ────────────//
+constexpr auto c_str<T, A>::_equal(c_str &  lhs_0,
+                                   const U* rhs_0, const U* rhs_N) noexcept -> void
+{
+	const auto sum {_size(rhs_0, rhs_N)};
+
+	// fix overflow
+	lhs_0.capacity(sum);
+
+	_fcopy
+	(
+		rhs_0, // U*
+		rhs_N, // U*
+		lhs_0.head()
+	);
+
+	// fix invariant
+	lhs_0.__size__(sum);
+}
+
+template <unit_t T, allo_t A>
+                            // [typeof(lhs) == typeof(rhs)]
+//────────────୨ৎ────────────//
+constexpr auto c_str<T, A>::_pqual(c_str &  lhs_0,
+                                   const T* rhs_0, const T* rhs_N) noexcept -> void
+{
+	const auto sum {lhs_0.size() + _size(rhs_0, rhs_N)};
+
+	// fix overflow
+	lhs_0.capacity(sum);
+
+	_fcopy
+	(
+		rhs_0, // U*
+		rhs_N, // U*
+		lhs_0.tail()
+	);
+
+	// fix invariant
+	lhs_0.__size__(sum);
+}
+
+template <unit_t T, allo_t A>
+template <unit_t U          > requires (!std::is_same_v<T, U>)
+//────────────୨ৎ────────────//
+constexpr auto c_str<T, A>::_pqual(c_str &  lhs_0,
+                                   const U* rhs_0, const U* rhs_N) noexcept -> void
+{
+	const auto sum {lhs_0.size() + _size(rhs_0, rhs_N)};
+
+	// fix overflow
+	lhs_0.capacity(sum);
+
+	_fcopy
+	(
+		rhs_0, // U*
+		rhs_N, // U*
+		lhs_0.tail()
+	);
+
+	// fix invariant
+	lhs_0.__size__(sum);
 }
 
 template <unit_t T, allo_t A>
