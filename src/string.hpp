@@ -308,7 +308,6 @@ public:
 	template <unit_t U,
 	          allo_t B>
 	constexpr operator c_str<U, B>() const noexcept;
-	[[deprecated("?")]]
 	constexpr operator std::string() const noexcept;
 
 	constexpr c_str() noexcept = default;
@@ -1459,8 +1458,8 @@ namespace detail
 
 		if (lhs_len < rhs_len) return;
 
-		size_t* const lps {new size_t[rhs_len]}; lps[0] = 0;
-		code_t* const ptn {new code_t[rhs_len]}; ptn[0] = 0;
+		std::vector<size_t> lps (rhs_len); lps[0] = 0;
+		std::vector<code_t> ptn (rhs_len); ptn[0] = 0;
 
 		// LPS build
 		{
@@ -1516,9 +1515,6 @@ namespace detail
 				}
 			}
 		}
-
-		delete[] lps;
-		delete[] ptn;
 	}
 
 	template <unit_t T,
@@ -1970,6 +1966,7 @@ template <unit_t T, allo_t A> constexpr auto c_str<T, A>::operator=(const c_str&
 
 		this->__size__(other.size());
 	}
+	return *this;
 }
 
 template <unit_t T, allo_t A> constexpr auto c_str<T, A>::operator=(/*&*/ c_str&& other) noexcept -> c_str&
@@ -1982,6 +1979,7 @@ template <unit_t T, allo_t A> constexpr auto c_str<T, A>::operator=(/*&*/ c_str&
 			other.store
 		);
 	}
+	return *this;
 }
 
 template <unit_t T, allo_t A> constexpr auto c_str<T, A>::size() const noexcept -> size_t
