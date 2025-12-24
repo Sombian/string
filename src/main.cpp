@@ -32,8 +32,8 @@ int main() noexcept
 
 TEST_CASE("storage")
 {
-	c_str small {"ABCDEFGHIJKLMNOPQRSTUVW"};
-	c_str large {"ÁBCDEFGHIJKLMNOPQRSTUVW"};
+	c_str small {u8"ABCDEFGHIJKLMNOPQRSTUVW"};
+	c_str large {u8"ÁBCDEFGHIJKLMNOPQRSTUVW"};
 
 	CHECK(small.size() == small.capacity());
 	CHECK(large.size() == large.capacity());
@@ -43,11 +43,11 @@ TEST_CASE("[API] string")
 {
 	SUBCASE("concatenation")
 	{
-		const utf8 foo {u8"티라"};
-		const utf8 bar {u8"미수"};
+		c_str foo {u8"티라"};
+		c_str bar {u8"미수"};
 
-		auto foo_foo {foo + foo};
-		auto foo_bar {foo + bar};
+		utf8 foo_foo {foo + foo};
+		utf8 foo_bar {foo + bar};
 
 		CHECK(foo_foo == u8"티라티라");
 		CHECK(foo_foo.length() == 4);
@@ -58,11 +58,11 @@ TEST_CASE("[API] string")
 
 	SUBCASE("split & match")
 	{
-		const utf8 str {u8"티라미수"
-		                u8"☆"
-		                u8"치즈케잌"
-		                u8"☆"
-		                u8"말차라떼"};
+		c_str str {u8"티라미수"
+		           u8"☆"
+		           u8"치즈케잌"
+		           u8"☆"
+		           u8"말차라떼"};
 
 		auto split {str.split(u8"☆")};
 
@@ -81,7 +81,7 @@ TEST_CASE("[API] fileof")
 {
 	SUBCASE("UTF-8")
 	{
-		const auto file {fileof("./src/sample/utf8std.txt")};
+		const auto file {fileof("./src/sample/utf8.txt")};
 
 		REQUIRE(file.has_value());
 
