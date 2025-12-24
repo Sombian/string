@@ -2220,7 +2220,7 @@ template <unit_t T, allo_t A> constexpr auto c_str<T, A>::operator[](size_t star
 template <unit_t T, allo_t A,
           unit_t U, size_t N> constexpr auto operator+(__ARRAY__(lhs), const c_str<T, A>& rhs) noexcept -> concat
 {
-	return {{&lhs[N - N], &lhs[N - 1]}, rhs};
+	return {slice<U> {&lhs[N - N], &lhs[N - 1]}, rhs};
 }
 
 template <unit_t T, allo_t A,
@@ -2484,19 +2484,19 @@ template <unit_t T /* ??? */> constexpr auto slice<T>::operator[](size_t start, 
 template <unit_t T /* ??? */,
           unit_t U, size_t N> constexpr auto operator+(__ARRAY__(lhs), const slice<T>& rhs) noexcept -> concat
 {
-	return {{&lhs[N - N], &lhs[N - 1]}, rhs};
+	return {slice<U> {&lhs[N - N], &lhs[N - 1]}, rhs};
 }
 
 template <unit_t T /* ??? */,
           unit_t U, size_t N> constexpr auto operator==(__ARRAY__(lhs), const slice<T>& rhs) noexcept -> bool
 {
-	return detail::_equal(&lhs[N - N], &lhs[N - 1], rhs.head(), rhs.tail());
+	return detail::_equal(&lhs[N - N], &lhs[N - 1], rhs.head, rhs.tail);
 }
 
 template <unit_t T /* ??? */,
           unit_t U, size_t N> constexpr auto operator!=(__ARRAY__(lhs), const slice<T>& rhs) noexcept -> bool
 {
-	return detail::_nqual(&lhs[N - N], &lhs[N - 1], rhs.head(), rhs.tail());
+	return detail::_nqual(&lhs[N - N], &lhs[N - 1], rhs.head, rhs.tail);
 }
 
 #pragma endregion slice
