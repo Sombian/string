@@ -1466,7 +1466,7 @@ namespace detail
 			size_t i {0};
 			size_t j {0};
 
-			for (cursor<T> it {rhs_0}; &it != rhs_N; ++it)
+			for (cursor<U> it {rhs_0}; &it != rhs_N; ++it)
 			{
 				ptn[i] = *it;
 
