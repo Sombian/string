@@ -201,25 +201,20 @@ template <unit_t T, allo_t A = std::allocator<T>> class c_str
 
 	#undef IS_BIG
 
-	//|---------------------------|
-	//|           small           |
-	//|------|------|------|------|
-	//| head | tail | size | meta |
-	//|------|------|------|------|
-	//|           bytes           |
-	//|---------------------------|
+	//┌───────────────────────────┐
+	//│           small           │
+	//├──────┬──────┬──────┬──────┤
+	//│ head │ tail │ size │ meta │
+	//├──────┴──────┴──────┴──────┤
+	//│           bytes           │
+	//└───────────────────────────┘
 
 	struct storage : A
 	{
 		union
 		{
-			buffer large
-			{
-				.head = 0,
-				.tail = 0,
-				.size = 0,
-				.meta = 0,
-			};
+			buffer large;
+
 			typedef T chunk_t;
 
 			chunk_t small
@@ -228,7 +223,7 @@ template <unit_t T, allo_t A = std::allocator<T>> class c_str
 			uint8_t bytes
 			[sizeof(buffer) / sizeof(uint8_t)];
 		}
-		__union__;
+		__union__ { .bytes {} };
 
 		constexpr  storage() noexcept;
 		constexpr ~storage() noexcept;
@@ -251,16 +246,6 @@ template <unit_t T, allo_t A = std::allocator<T>> class c_str
 
 	// fixes invariant; use it after internal manipulation.
 	constexpr auto __size__(size_t value) noexcept -> void;
-
-	// sanity check
-	static_assert(std::is_standard_layout_v<buffer>);
-	static_assert(std::is_trivially_copyable_v<buffer>);
-	// memory check
-	static_assert(sizeof(buffer) == sizeof(size_t) * 3);
-	static_assert(alignof(buffer) == alignof(size_t) * 1);
-	// layout check
-	static_assert(offsetof(buffer, head) == sizeof(size_t) * 0);
-	static_assert(offsetof(buffer, tail) == sizeof(size_t) * 1);
 
 	storage store;
 
@@ -297,6 +282,19 @@ template <unit_t T, allo_t A = std::allocator<T>> class c_str
 
 		constexpr auto operator=(char32_t code) noexcept -> writer&;
 	};
+
+	// series of sanity-check!
+
+	static_assert(sizeof(storage) == sizeof(buffer));
+
+	static_assert(std::is_standard_layout_v<buffer>);
+	static_assert(std::is_trivially_copyable_v<buffer>);
+
+	static_assert(sizeof(buffer) == sizeof(size_t) * 3);
+	static_assert(alignof(buffer) == alignof(size_t) * 1);
+
+	static_assert(offsetof(buffer, head) == sizeof(size_t) * 0);
+	static_assert(offsetof(buffer, tail) == sizeof(size_t) * 1);
 
 public:
 
@@ -783,23 +781,23 @@ template <unit_t T /* ??? */> constexpr auto codec<T>::size(char32_t code) noexc
 		const auto N {std::bit_width
 		(static_cast<uint32_t>(code))};
 
-		//|-----------------------|
-		//| U+000000 ... U+00007F | -> 1 code unit
-		//| U+000080 ... U+0007FF | -> 2 code unit
-		//| U+000800 ... U+00FFFF | -> 3 code unit
-		//| U+010000 ... U+10FFFF | -> 4 code unit
-		//|-----------------------|
+		//┌───────────────────────┐
+		//│ U+000000 ... U+00007F │ -> 1 code unit
+		//│ U+000080 ... U+0007FF │ -> 2 code unit
+		//│ U+000800 ... U+00FFFF │ -> 3 code unit
+		//│ U+010000 ... U+10FFFF │ -> 4 code unit
+		//└───────────────────────┘
 
 		return 1 + (8 <= N) + (12 <= N) + (17 <= N);
 	}
 
 	if constexpr (std::is_same_v<T, char16_t>)
 	{
-		//|-----------------------|
-		//| U+000000 ... U+00D7FF | -> 1 code unit
-		//| U+00E000 ... U+00FFFF | -> 1 code unit
-		//| U+000000 ... U+10FFFF | -> 2 code unit
-		//|-----------------------|
+		//┌───────────────────────┐
+		//│ U+000000 ... U+00D7FF │ -> 1 code unit
+		//│ U+00E000 ... U+00FFFF │ -> 1 code unit
+		//│ U+000000 ... U+10FFFF │ -> 2 code unit
+		//└───────────────────────┘
 
 		return 1 + (0xFFFF /* surrogate */ < code);
 	}
@@ -814,14 +812,16 @@ template <unit_t T /* ??? */> constexpr auto codec<T>::next(const T* data) noexc
 {
 	constexpr static const int8_t TABLE[]
 	{
-		/*| 0x0 |*/ 1, /*| 0x1 |*/ 1,
-		/*| 0x2 |*/ 1, /*| 0x3 |*/ 1,
-		/*| 0x4 |*/ 1, /*| 0x5 |*/ 1,
-		/*| 0x6 |*/ 1, /*| 0x7 |*/ 1,
-		/*| 0x8 |*/ 1, /*| 0x9 |*/ 1,
-		/*| 0xA |*/ 1, /*| 0xB |*/ 1,
-		/*| 0xC |*/ 2, /*| 0xD |*/ 2,
-		/*| 0xE |*/ 3, /*| 0xF |*/ 4,
+		/*┌─────┬────────┬─────┬────────┐*/
+		/*│ 0x0 │*/ 1, /*│ 0x1 │*/ 1, /*│*/
+		/*│ 0x2 │*/ 1, /*│ 0x3 │*/ 1, /*│*/
+		/*│ 0x4 │*/ 1, /*│ 0x5 │*/ 1, /*│*/
+		/*│ 0x6 │*/ 1, /*│ 0x7 │*/ 1, /*│*/
+		/*│ 0x8 │*/ 1, /*│ 0x9 │*/ 1, /*│*/
+		/*│ 0xA │*/ 1, /*│ 0xB │*/ 1, /*│*/
+		/*│ 0xC │*/ 2, /*│ 0xD │*/ 2, /*│*/
+		/*│ 0xE │*/ 3, /*│ 0xF │*/ 4, /*│*/
+		/*└─────┴────────┴─────┴────────┘*/
 	};
 
 	if constexpr (std::is_same_v<T, char8_t>)
@@ -1396,7 +1396,7 @@ namespace detail
 				lhs_ptr += T_size;
 				rhs_ptr += U_size;
 			}
-			return true;
+			return lhs_ptr == lhs_N && rhs_ptr == rhs_N;
 		}
 	}
 
@@ -1438,7 +1438,7 @@ namespace detail
 				lhs_ptr += T_size;
 				rhs_ptr += U_size;
 			}
-			return false;
+			return lhs_ptr != lhs_N || rhs_ptr != rhs_N;
 		}
 	}
 
@@ -1675,6 +1675,7 @@ template <unit_t T, allo_t A> constexpr c_str<T, A>::buffer::operator /*&*/ T*()
 template <unit_t T, allo_t A> constexpr c_str<T, A>::storage::storage() noexcept
 {
 	this->__union__.bytes[RMB] = MAX << SFT;
+	std::construct_at(this->__union__.small);
 }
 
 template <unit_t T, allo_t A> constexpr c_str<T, A>::storage::~storage() noexcept
@@ -1754,6 +1755,8 @@ template <unit_t T, allo_t A> constexpr auto c_str<T, A>::capacity(size_t value)
 		T* head {allocator::allocate(this->store, value + 1)};
 		T* tail {/* <one-past-the-end!> */(head + value + 1)};
 
+		const auto size {this->size()};
+
 		detail::_fcopy
 		(
 			this->head(),
@@ -1773,12 +1776,13 @@ template <unit_t T, allo_t A> constexpr auto c_str<T, A>::capacity(size_t value)
 			);
 		}
 
-		const auto size {this->size()};
-
-		this->store.__union__.large.head = head;
-		this->store.__union__.large.tail = tail;
-		this->store.__union__.large.size = size;
-		this->store.__union__.large.meta = LARGE;
+		std::construct_at(&this->store.__union__.large);
+		{
+			this->store.__union__.large.head = head;
+			this->store.__union__.large.tail = tail;
+			this->store.__union__.large.size = size;
+			this->store.__union__.large.meta = LARGE;
+		}
 	}
 }
 
@@ -1790,13 +1794,13 @@ template <unit_t T, allo_t A> constexpr auto c_str<T, A>::__size__(size_t value)
 		{
 			const auto slot {(MAX - value) << SFT};
 
-			//|------------|    |-------[LE]-------|
-			//| 0b0XXXXXXX | -> | no need for skip |
-			//|------------|    |------------------|
+			//┌────────────┐    ┌───────[LE]───────┐
+			//│ 0b0XXXXXXX │ -> │ no need for skip │
+			//└────────────┘    └──────────────────┘
 
-			//|------------|    |-------[BE]-------|
-			//| 0bXXXXXXX0 | -> | skip right 1 bit |
-			//|------------|    |------------------|
+			//┌────────────┐    ┌───────[BE]───────┐
+			//│ 0bXXXXXXX0 │ -> │ skip right 1 bit │
+			//└────────────┘    └──────────────────┘
 
 			this->store.__union__.bytes[RMB] = slot;
 			this->store.__union__.small[value] = '\0';
@@ -1945,8 +1949,8 @@ template <unit_t T, allo_t A> constexpr c_str<T, A>::c_str(/*&*/ c_str&& other) 
 	{
 		std::swap
 		(
-			this->store,
-			other.store
+			this->store.__union__.bytes,
+			other.store.__union__.bytes
 		);
 	}
 }
@@ -1975,8 +1979,8 @@ template <unit_t T, allo_t A> constexpr auto c_str<T, A>::operator=(/*&*/ c_str&
 	{
 		std::swap
 		(
-			this->store,
-			other.store
+			this->store.__union__.bytes,
+			other.store.__union__.bytes
 		);
 	}
 	return *this;
