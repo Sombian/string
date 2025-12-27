@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <filesystem>
 
+namespace utf {
+
 //┌───────────────────────────────────────────────────────────┐
 //│   ░██████                ░██████   ░██████████░█████████  │
 //│  ░██   ░██              ░██   ░██      ░██    ░██     ░██ │
@@ -2782,3 +2784,5 @@ template <size_t N> c_str(const char32_t (&str)[N]) -> c_str<char32_t>;
 template <size_t N> slice(const char8_t (&str)[N]) -> slice<char8_t>;
 template <size_t N> slice(const char16_t (&str)[N]) -> slice<char16_t>;
 template <size_t N> slice(const char32_t (&str)[N]) -> slice<char32_t>;
+
+} // namespace utf

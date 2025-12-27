@@ -13,11 +13,7 @@ a header only string impl. requires **C++23** or later.
 
 int main() noexcept
 {
-	using range::N;
-
-	ut8 str {u8"hello world"};
-
-	assert(str == str[0, N]);
+	utf::ut8 str {u8"メスガキ"};
 
 	std::cout << str << '\n';
 }
@@ -29,7 +25,7 @@ for this reason using an iterator is recommended for linear traversal.
 ### ✔️ O(N)
 
 ```c++
-utf8 str {u8"hello world"};
+utf::utf8 str {u8"hello world"};
 
 // time complexity: O(N)
 for (const auto code : str)
@@ -41,7 +37,7 @@ for (const auto code : str)
 ### ❌ O(N^2)
 
 ```c++
-utf8 str {u8"hello world"};
+utf::utf8 str {u8"hello world"};
 
 // time complexity: O(N)
 const auto len {str.length()};
