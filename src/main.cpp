@@ -43,17 +43,23 @@ TEST_CASE("[API] string")
 {
 	SUBCASE("concatenation")
 	{
-		c_str foo {u8"티라"};
-		c_str bar {u8"미수"};
+		c_str 티라 {u8"티라"};
+		c_str 미수 {u8"미수"};
 
-		utf8 foo_foo {foo + foo};
-		utf8 foo_bar {foo + bar};
+		CHECK(티라.starts_with(티라));
+		CHECK(티라.ends_with(u8"티라"));
 
-		CHECK(foo_foo == u8"티라티라");
-		CHECK(foo_foo.length() == 4);
+		CHECK(미수.starts_with(미수));
+		CHECK(미수.ends_with(u8"미수"));
 
-		CHECK(foo_bar == u8"티라미수");
-		CHECK(foo_bar.length() == 4);
+		utf8 티라미수 {티라 + 미수};
+		utf8 티라티라 {티라 + 티라};
+
+		CHECK(티라미수 == u8"티라미수");
+		CHECK(티라미수.length() == 4);
+
+		CHECK(티라티라 == u8"티라티라");
+		CHECK(티라티라.length() == 4);
 	}
 
 	SUBCASE("split & match")

@@ -15,7 +15,7 @@ int main() noexcept
 {
 	using range::N;
 
-	c_str str {"hello world"};
+	ut8 str {u8"hello world"};
 
 	assert(str == str[0, N]);
 
