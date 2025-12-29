@@ -30,21 +30,21 @@ int main() noexcept
 
 #include "doctest.h"
 
-TEST_CASE("storage")
-{
-	utf::c_str small {u8"ABCDEFGHIJKLMNOPQRSTUVW"};
-	utf::c_str large {u8"ÁBCDEFGHIJKLMNOPQRSTUVW"};
-
-	CHECK(small.size() == small.capacity());
-	CHECK(large.size() == large.capacity());
-}
-
 TEST_CASE("[API] string")
 {
-	SUBCASE("concatenation")
+	SUBCASE("SSO23")
 	{
-		utf::c_str 티라 {u8"티라"};
-		utf::c_str 미수 {u8"미수"};
+		utf::c_str small {u8"ABCDEFGHIJKLMNOPQRSTUVW"};
+		utf::c_str large {u8"ÁBCDEFGHIJKLMNOPQRSTUVW"};
+
+		CHECK(small.size() == small.capacity());
+		CHECK(large.size() == large.capacity());
+	}
+
+	SUBCASE("concat")
+	{
+		utf::utf8 티라 {u8"티라"};
+		utf::utf8 미수 {u8"미수"};
 
 		CHECK(티라.starts_with(티라));
 		CHECK(티라.ends_with(u8"티라"));
@@ -62,13 +62,13 @@ TEST_CASE("[API] string")
 		CHECK(티라티라.length() == 4);
 	}
 
-	SUBCASE("split & match")
+	SUBCASE("split")
 	{
-		utf::c_str str {u8"티라미수"
-		                u8"☆"
-		                u8"치즈케잌"
-		                u8"☆"
-		                u8"말차라떼"};
+		utf::utf8 str {u8"티라미수"
+		               u8"☆"
+		               u8"치즈케잌"
+		               u8"☆"
+		               u8"말차라떼"};
 
 		auto split {str.split(u8"☆")};
 
@@ -80,6 +80,21 @@ TEST_CASE("[API] string")
 
 		CHECK(split[2] == u8"말차라떼");
 		CHECK(split[2] == u"말차라떼");
+	}
+
+	SUBCASE("index")
+	{
+		utf::utf8 str {u8"티라미수"};
+
+		using utf::range::N;
+
+		CHECK(str[0] == U'티');
+		CHECK(str[1] == U'라');
+		CHECK(str[2] == U'미');
+		CHECK(str[3] == U'수');
+
+		CHECK(str.substr(0, N) == str);
+		CHECK(str.substr(0, 4) == str);
 	}
 }
 
