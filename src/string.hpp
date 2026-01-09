@@ -1235,6 +1235,42 @@ template <size_t                       N> constexpr auto string<Super, Codec>::e
 }
 
 template <typename Super, typename Codec>
+template <typename Other, typename Arena> constexpr auto string<Super, Codec>::contains(__OWNED__(value)) const noexcept -> bool
+{
+	return !detail::__match__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail()).empty();
+}
+
+template <typename Super, typename Codec>
+template <typename Other /* can't own */> constexpr auto string<Super, Codec>::contains(__SLICE__(value)) const noexcept -> bool
+{
+	return !detail::__match__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail()).empty();
+}
+
+template <typename Super, typename Codec>
+template <size_t                       N> constexpr auto string<Super, Codec>::contains(__EQSTR__(value)) const noexcept -> bool requires (std::is_same_v<T, char>)
+{
+	return !detail::__match__<Codec, Codec>(this->head(), this->tail(), &value[N - N], &value[N - 1]).empty();
+}
+
+template <typename Super, typename Codec>
+template <size_t                       N> constexpr auto string<Super, Codec>::contains(__1BSTR__(value)) const noexcept -> bool /* encoding of char8_t is trivial */
+{
+	return !detail::__match__<Codec, codec<"UTF-8">>(this->head(), this->tail(), &value[N - N], &value[N - 1]).empty();
+}
+
+template <typename Super, typename Codec>
+template <size_t                       N> constexpr auto string<Super, Codec>::contains(__2BSTR__(value)) const noexcept -> bool /* encoding of char16_t is trivial */
+{
+	return !detail::__match__<Codec, codec<"UTF-16">>(this->head(), this->tail(), &value[N - N], &value[N - 1]).empty();
+}
+
+template <typename Super, typename Codec>
+template <size_t                       N> constexpr auto string<Super, Codec>::contains(__4BSTR__(value)) const noexcept -> bool /* encoding of char32_t is trivial */
+{
+	return !detail::__match__<Codec, codec<"UTF-32">>(this->head(), this->tail(), &value[N - N], &value[N - 1]).empty();
+}
+
+template <typename Super, typename Codec>
 template <typename Other, typename Arena> constexpr auto string<Super, Codec>::split(__OWNED__(value)) const noexcept -> std::vector<slice<Codec>>
 {
 	return detail::__split__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail());
@@ -2693,7 +2729,7 @@ template <typename Other /* can't own */> constexpr auto c_str<Codec, Alloc>::__
 
 	this->capacity(size);
 
-	detail::__fcopy__<Codec, Other>(rhs_0, rhs_N, this->__head__());
+	detail::__fcopy__<Codec, Other>(rhs_0, rhs_N, this->__tail__());
 
 	this->__size__(size);
 }
