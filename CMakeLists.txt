@@ -18,7 +18,7 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 	add_compile_options(-Wall -Wextra -Wpedantic -Wold-style-cast)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 	add_link_options("-fuse-ld=link")
-	add_compile_options(/Wall /sdl /permissive- /fsanitize /utf-8)
+	add_compile_options(/Wall /permissive- /fsanitize=address /utf-8)
 endif()
 
 # main entry point...
