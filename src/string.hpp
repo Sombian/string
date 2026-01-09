@@ -299,10 +299,10 @@ public:
 	constexpr auto match(__4BSTR__(value)) const noexcept -> std::vector<slice<Codec>> /* encoding of char32_t is trivial */;
 
 	// returns a slice, of which is a product of substring. N is a sentinel value.
-	constexpr auto substr(clamp       start, clamp       until) const noexcept -> slice<Codec>;
-	constexpr auto substr(clamp       start, range       until) const noexcept -> slice<Codec>;
-	constexpr auto substr(size_t start, clamp       until) const noexcept -> slice<Codec>;
-	constexpr auto substr(size_t start, range       until) const noexcept -> slice<Codec>;
+	constexpr auto substr(clamp  start, clamp  until) const noexcept -> slice<Codec>;
+	constexpr auto substr(clamp  start, range  until) const noexcept -> slice<Codec>;
+	constexpr auto substr(size_t start, clamp  until) const noexcept -> slice<Codec>;
+	constexpr auto substr(size_t start, range  until) const noexcept -> slice<Codec>;
 	constexpr auto substr(size_t start, size_t until) const noexcept -> slice<Codec>;
 
 	// iterator
@@ -1342,22 +1342,22 @@ template <size_t                       N> constexpr auto string<Super, Codec>::m
 	return detail::__match__<Codec, codec<"UTF-32">>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec> constexpr auto string<Super, Codec>::substr(clamp       start, clamp       until) const noexcept -> slice<Codec>
+template <typename Super, typename Codec> constexpr auto string<Super, Codec>::substr(clamp  start, clamp  until) const noexcept -> slice<Codec>
 {
 	return detail::__substr__<Codec /*&*/>(this->head(), this->tail(), start, until);
 }
 
-template <typename Super, typename Codec> constexpr auto string<Super, Codec>::substr(clamp       start, range       until) const noexcept -> slice<Codec>
+template <typename Super, typename Codec> constexpr auto string<Super, Codec>::substr(clamp  start, range  until) const noexcept -> slice<Codec>
 {
 	return detail::__substr__<Codec /*&*/>(this->head(), this->tail(), start, until);
 }
 
-template <typename Super, typename Codec> constexpr auto string<Super, Codec>::substr(size_t start, clamp       until) const noexcept -> slice<Codec>
+template <typename Super, typename Codec> constexpr auto string<Super, Codec>::substr(size_t start, clamp  until) const noexcept -> slice<Codec>
 {
 	return detail::__substr__<Codec /*&*/>(this->head(), this->tail(), start, until);
 }
 
-template <typename Super, typename Codec> constexpr auto string<Super, Codec>::substr(size_t start, range       until) const noexcept -> slice<Codec>
+template <typename Super, typename Codec> constexpr auto string<Super, Codec>::substr(size_t start, range  until) const noexcept -> slice<Codec>
 {
 	return detail::__substr__<Codec /*&*/>(this->head(), this->tail(), start, until);
 }

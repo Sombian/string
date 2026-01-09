@@ -19,6 +19,20 @@ int main() noexcept
 }
 ```
 
+## c_str
+
+`c_str` is a struct that owns the string content.  
+it can convert from, and to any available encoding encoded string.  
+likewise, all its API accepts any available encoding encoded string.  
+
+## slice
+
+`slice` is a struct that holds ptr to the string.  
+it can convert from, and to any available encoding encoded string.  
+likewise, all its API accepts any available encoding encoded string.  
+
+## trivia
+
 code point random accessing is **O(N)** for variable width encoding.  
 for this reason using an iterator is recommended for linear traversal.  
 
