@@ -12,9 +12,39 @@
 #include <utility>
 #include <ostream>
 #include <fstream>
+#include <iterator>
 #include <optional>
 #include <algorithm>
 #include <filesystem>
+
+inline auto operator<<(std::ostream& os, char32_t code) noexcept -> decltype(os)
+{
+	char out[4]; short unit {0};
+
+	if (code <= 0x00007F)
+	{
+		out[unit++] = static_cast<char>(code /* safe to truncate */);
+	}
+	else if (code <= 0x0007FF)
+	{
+		out[unit++] = static_cast<char>(0xC0 | ((code >> 06) & 0x1F));
+		out[unit++] = static_cast<char>(0x80 | ((code >> 00) & 0x3F));
+	}
+	else if (code <= 0x00FFFF)
+	{
+		out[unit++] = static_cast<char>(0xE0 | ((code >> 12) & 0x0F));
+		out[unit++] = static_cast<char>(0x80 | ((code >> 06) & 0x3F));
+		out[unit++] = static_cast<char>(0x80 | ((code >> 00) & 0x3F));
+	}
+	else if (code <= 0x10FFFF)
+	{
+		out[unit++] = static_cast<char>(0xF0 | ((code >> 18) & 0x07));
+		out[unit++] = static_cast<char>(0x80 | ((code >> 12) & 0x3F));
+		out[unit++] = static_cast<char>(0x80 | ((code >> 06) & 0x3F));
+		out[unit++] = static_cast<char>(0x80 | ((code >> 00) & 0x3F));
+	}
+	return os.write(out, unit);
+}
 
 namespace utf {
 
@@ -162,20 +192,29 @@ template <typename Super, typename Codec> class string
 	constexpr auto head() const noexcept -> const T*;
 	constexpr auto tail() const noexcept -> const T*;
 
-	/* bidirectional iterator; tricky! */ class cursor
+	/* bidirectional iterator; awesome */ class cursor
 	{
 		const T* ptr;
 
 	public:
 
+		using iterator_category = std::bidirectional_iterator_tag;
+		// for STL algorithms; itrator trait
+		using difference_type = ptrdiff_t;
+		using value_type = char32_t;
+		using reference = char32_t;
+		using pointer = const T*;
+
 		constexpr cursor
 		(
 			decltype(ptr) ptr
+			=
+			nullptr // for STL
 		)
 		noexcept : ptr(ptr) {}
 
-		constexpr auto operator*() noexcept -> char32_t;
-		constexpr auto operator&() noexcept -> const T*;
+		constexpr auto operator*() const noexcept -> char32_t;
+		constexpr auto operator&() const noexcept -> const T*;
 
 		constexpr auto operator++(   ) noexcept -> cursor&;
 		constexpr auto operator++(int) noexcept -> cursor;
@@ -183,8 +222,8 @@ template <typename Super, typename Codec> class string
 		constexpr auto operator--(   ) noexcept -> cursor&;
 		constexpr auto operator--(int) noexcept -> cursor;
 
-		constexpr auto operator==(const cursor& rhs) noexcept -> bool;
-		constexpr auto operator!=(const cursor& rhs) noexcept -> bool;
+		constexpr auto operator==(const cursor& rhs) const noexcept -> bool;
+		constexpr auto operator!=(const cursor& rhs) const noexcept -> bool;
 	};
 
 	template <typename LHS, typename RHS> class concat
@@ -259,17 +298,17 @@ public:
 
 	// *self explanatory* returns whether or not it contains *parameter*.
 	template <typename Other, typename Arena>
-	constexpr auto contains(__OWNED__(value)) const noexcept -> bool;
+	constexpr auto contains(__OWNED__(value)) const noexcept -> size_t;
 	template <typename Other /* can't own */>
-	constexpr auto contains(__SLICE__(value)) const noexcept -> bool;
+	constexpr auto contains(__SLICE__(value)) const noexcept -> size_t;
 	template <size_t                       N>
-	constexpr auto contains(__EQSTR__(value)) const noexcept -> bool requires (std::is_same_v<T, char>);
+	constexpr auto contains(__EQSTR__(value)) const noexcept -> size_t requires (std::is_same_v<T, char>);
 	template <size_t                       N>
-	constexpr auto contains(__1BSTR__(value)) const noexcept -> bool /* encoding of char8_t is trivial */;
+	constexpr auto contains(__1BSTR__(value)) const noexcept -> size_t /* encoding of char8_t is trivial */;
 	template <size_t                       N>
-	constexpr auto contains(__2BSTR__(value)) const noexcept -> bool /* encoding of char16_t is trivial */;
+	constexpr auto contains(__2BSTR__(value)) const noexcept -> size_t /* encoding of char16_t is trivial */;
 	template <size_t                       N>
-	constexpr auto contains(__4BSTR__(value)) const noexcept -> bool /* encoding of char32_t is trivial */;
+	constexpr auto contains(__4BSTR__(value)) const noexcept -> size_t /* encoding of char32_t is trivial */;
 
 	// returns a list of string slice, of which is a product of split aka division.
 	template <typename Other, typename Arena>
@@ -1308,39 +1347,39 @@ template <size_t                       N> constexpr auto string<Super, Codec>::e
 }
 
 template <typename Super, typename Codec>
-template <typename Other, typename Arena> constexpr auto string<Super, Codec>::contains(__OWNED__(value)) const noexcept -> bool
+template <typename Other, typename Arena> constexpr auto string<Super, Codec>::contains(__OWNED__(value)) const noexcept -> size_t
 {
-	return !detail::__match__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail()).empty();
+	return detail::__match__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail()).size();
 }
 
 template <typename Super, typename Codec>
-template <typename Other /* can't own */> constexpr auto string<Super, Codec>::contains(__SLICE__(value)) const noexcept -> bool
+template <typename Other /* can't own */> constexpr auto string<Super, Codec>::contains(__SLICE__(value)) const noexcept -> size_t
 {
-	return !detail::__match__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail()).empty();
+	return detail::__match__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail()).size();
 }
 
 template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto string<Super, Codec>::contains(__EQSTR__(value)) const noexcept -> bool requires (std::is_same_v<T, char>)
+template <size_t                       N> constexpr auto string<Super, Codec>::contains(__EQSTR__(value)) const noexcept -> size_t requires (std::is_same_v<T, char>)
 {
-	return !detail::__match__<Codec, Codec>(this->head(), this->tail(), &value[N - N], &value[N - 1]).empty();
+	return detail::__match__<Codec, Codec>(this->head(), this->tail(), &value[N - N], &value[N - 1]).size();
 }
 
 template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto string<Super, Codec>::contains(__1BSTR__(value)) const noexcept -> bool /* encoding of char8_t is trivial */
+template <size_t                       N> constexpr auto string<Super, Codec>::contains(__1BSTR__(value)) const noexcept -> size_t /* encoding of char8_t is trivial */
 {
-	return !detail::__match__<Codec, codec<"UTF-8">>(this->head(), this->tail(), &value[N - N], &value[N - 1]).empty();
+	return detail::__match__<Codec, codec<"UTF-8">>(this->head(), this->tail(), &value[N - N], &value[N - 1]).size();
 }
 
 template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto string<Super, Codec>::contains(__2BSTR__(value)) const noexcept -> bool /* encoding of char16_t is trivial */
+template <size_t                       N> constexpr auto string<Super, Codec>::contains(__2BSTR__(value)) const noexcept -> size_t /* encoding of char16_t is trivial */
 {
-	return !detail::__match__<Codec, codec<"UTF-16">>(this->head(), this->tail(), &value[N - N], &value[N - 1]).empty();
+	return detail::__match__<Codec, codec<"UTF-16">>(this->head(), this->tail(), &value[N - N], &value[N - 1]).size();
 }
 
 template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto string<Super, Codec>::contains(__4BSTR__(value)) const noexcept -> bool /* encoding of char32_t is trivial */
+template <size_t                       N> constexpr auto string<Super, Codec>::contains(__4BSTR__(value)) const noexcept -> size_t /* encoding of char32_t is trivial */
 {
-	return !detail::__match__<Codec, codec<"UTF-32">>(this->head(), this->tail(), &value[N - N], &value[N - 1]).empty();
+	return detail::__match__<Codec, codec<"UTF-32">>(this->head(), this->tail(), &value[N - N], &value[N - 1]).size();
 }
 
 template <typename Super, typename Codec>
@@ -1571,7 +1610,7 @@ template <size_t                       N> constexpr auto string<Super, Codec>::o
 #pragma endregion CRTP
 #pragma region CRTP::cursor
 
-template <typename Super, typename Codec> constexpr auto string<Super, Codec>::cursor::operator*() noexcept -> char32_t
+template <typename Super, typename Codec> constexpr auto string<Super, Codec>::cursor::operator*() const noexcept -> char32_t
 {
 	char32_t T_out;
 
@@ -1581,7 +1620,7 @@ template <typename Super, typename Codec> constexpr auto string<Super, Codec>::c
 	return T_out;
 }
 
-template <typename Super, typename Codec> constexpr auto string<Super, Codec>::cursor::operator&() noexcept -> const T*
+template <typename Super, typename Codec> constexpr auto string<Super, Codec>::cursor::operator&() const noexcept -> const T*
 {
 	return this->ptr;
 }
@@ -1606,12 +1645,12 @@ template <typename Super, typename Codec> constexpr auto string<Super, Codec>::c
 	const auto clone {*this}; operator--(); return clone;
 }
 
-template <typename Super, typename Codec> constexpr auto string<Super, Codec>::cursor::operator==(const cursor& rhs) noexcept -> bool
+template <typename Super, typename Codec> constexpr auto string<Super, Codec>::cursor::operator==(const cursor& rhs) const noexcept -> bool
 {
 	return this->ptr == rhs.ptr;
 }
 
-template <typename Super, typename Codec> constexpr auto string<Super, Codec>::cursor::operator!=(const cursor& rhs) noexcept -> bool
+template <typename Super, typename Codec> constexpr auto string<Super, Codec>::cursor::operator!=(const cursor& rhs) const noexcept -> bool
 {
 	return this->ptr != rhs.ptr;
 }
