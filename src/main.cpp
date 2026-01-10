@@ -47,10 +47,10 @@ TEST_CASE("[API] string")
 		utf::utf8 미수 {u8"미수"};
 
 		CHECK(티라.starts_with(티라));
-		CHECK(티라.ends_with(u8"티라"));
+		CHECK(티라.ends_with(u"티라"));
 
 		CHECK(미수.starts_with(미수));
-		CHECK(미수.ends_with(u8"미수"));
+		CHECK(미수.ends_with(u"미수"));
 
 		utf::utf8 티라미수 {티라 + 미수};
 		utf::utf8 티라티라 {티라 + 티라};
@@ -70,16 +70,18 @@ TEST_CASE("[API] string")
 		               u8"☆"
 		               u8"말차라떼"};
 
-		auto split {str.split(u8"☆")};
+		auto split {str.split(u"☆")};
+
+		CHECK(split[0] == u"티라미수");
+		CHECK(split[1] == u"치즈케잌");
+		CHECK(split[2] == u"말차라떼");
 
 		CHECK(split[0] == u8"티라미수");
-		CHECK(split[0] == u"티라미수");
-
 		CHECK(split[1] == u8"치즈케잌");
-		CHECK(split[1] == u"치즈케잌");
-
 		CHECK(split[2] == u8"말차라떼");
-		CHECK(split[2] == u"말차라떼");
+
+		CHECK(str.split(str).size() == 0);
+		CHECK(str.match(str).size() == 1);
 	}
 
 	SUBCASE("index")

@@ -28,6 +28,8 @@ add_executable(main src/main.cpp)
 file(GLOB_RECURSE GIT_SUBMODULE_DIR
 	LIST_DIRECTORIES true
 	"${CMAKE_SOURCE_DIR}/pkg/**/*.h"
+	"${CMAKE_SOURCE_DIR}/pkg/**/*.h++"
+	"${CMAKE_SOURCE_DIR}/pkg/**/*.hxx"
 	"${CMAKE_SOURCE_DIR}/pkg/**/*.hpp"
 )
 list(REMOVE_DUPLICATES GIT_SUBMODULE_DIR)
