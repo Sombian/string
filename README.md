@@ -13,21 +13,21 @@ a header only string impl. requires **C++23** or later.
 
 int main() noexcept
 {
-	utf::ut8 str {u8"メスガキ"};
+	utf::str str {u8"メスガキ"};
 
 	std::cout << str << '\n';
 }
 ```
 
-## c_str
+## str
 
-`c_str` is a struct that owns the string content.  
+`str` is a struct that owns the string content.  
 it can convert from, and to any available encoding encoded string.  
 likewise, all its API accepts any available encoding encoded string.  
 
-## slice
+## txt
 
-`slice` is a struct that holds ptr to the string.  
+`txt` is a struct that holds ptr to the string.  
 it can convert from, and to any available encoding encoded string.  
 likewise, all its API accepts any available encoding encoded string.  
 
@@ -39,7 +39,7 @@ for this reason using an iterator is recommended for linear traversal.
 ### ✔️ O(N)
 
 ```c++
-utf::utf8 str {u8"hello world"};
+utf::str str {u8"hello world"};
 
 // time complexity: O(N)
 for (const auto code : str)
@@ -51,7 +51,7 @@ for (const auto code : str)
 ### ❌ O(N^2)
 
 ```c++
-utf::utf8 str {u8"hello world"};
+utf::str str {u8"hello world"};
 
 // time complexity: O(N)
 const auto len {str.length()};

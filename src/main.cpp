@@ -34,8 +34,8 @@ TEST_CASE("[API] string")
 {
 	SUBCASE("SSO23")
 	{
-		utf::c_str small {u8"ABCDEFGHIJKLMNOPQRSTUVW"};
-		utf::c_str large {u8"ÁBCDEFGHIJKLMNOPQRSTUVW"};
+		utf::str small {u8"ABCDEFGHIJKLMNOPQRSTUVW"};
+		utf::str large {u8"ÁBCDEFGHIJKLMNOPQRSTUVW"};
 
 		CHECK(small.size() == small.capacity());
 		CHECK(large.size() == large.capacity());
