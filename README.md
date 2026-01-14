@@ -68,14 +68,58 @@ for (int i {0}; i < len; ++i)
 whilst all API works seamlessly with other available encoding encoded string,  
 its best to match the operand's encoding to that of lhs, for greater effciency.  
 
-### ✔️ O(N)
+### ✔️ std::memcpy
 
 ```c++
 utf::utf8 str {u8"hello world"};
 ```
 
-### ❌ O(N^2)
+### ❌ transcoding
 
 ```c++
 utf::utf8 str {u"hello world"};
+```
+
+likewise, its also important to cache `.length()` for variable width encoding.  
+
+### ✔️ O(N) * 1
+
+```c++
+utf::utf8 str {u8"hello world"};
+
+const auto strlen {str.length()};
+
+if (0 < strlen) { /*...*/ }
+if (0 < strlen) { /*...*/ }
+```
+
+### ❌ O(N) * 2
+
+```c++
+utf::utf8 str {u8"hello world"};
+
+if (0 < str.length()) { /*...*/ }
+if (0 < str.length()) { /*...*/ }
+```
+
+if you need to substr that involves end of the string, consider using `range::N`.  
+
+### ✔️ walks backward
+
+```c++
+utf::utf8 str {u8"hello world"};
+
+using range::N;
+
+const auto txt {str.substr(0, N - 69)};
+```
+
+### ❌ walks forward
+
+```c++
+utf::utf8 str {u8"hello world"};
+
+const auto N {str.length()};
+
+const auto txt {str.substr(0, N - 69)};
 ```
