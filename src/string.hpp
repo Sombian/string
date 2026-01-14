@@ -1,3 +1,5 @@
+// NOLINTBEGIN(*-avoid-c-arrays, *-signed-bitwise, *-union-access, *-magic-numbers, *-bounds-pointer-arithmetic, *-easily-swappable-parameters)
+
 #pragma once
 
 #include <cassert>
@@ -104,7 +106,6 @@ inline constexpr auto operator-
 (range, size_t offset) noexcept
 -> clamp { return { offset }; }
 
-// Coder & Decoder
 template <label> struct codec
 {
 	static_assert(false, "?");
@@ -1775,13 +1776,13 @@ template <typename Other, typename Arena> constexpr API<Super, Codec>::concat<LH
 
 		if constexpr (!std::is_same_v<Ty, none_t>)
 		{
-			[&]<typename 𝒞𝑜𝒹𝑒𝒸>(const txt<𝒞𝑜𝒹𝑒𝒸>& slice)
+			[&]<typename Impl>(const txt<Impl>& slice)
 			{
-				if constexpr (std::is_same_v<Other, 𝒞𝑜𝒹𝑒𝒸>)
+				if constexpr (std::is_same_v<Other, Impl>)
 				{
 					size += detail::__difcu__<Other>(slice.head(), slice.tail());
 				}
-				if constexpr (!std::is_same_v<Other, 𝒞𝑜𝒹𝑒𝒸>)
+				if constexpr (!std::is_same_v<Other, Impl>)
 				{
 					for (const auto code : slice) { size += Other::size(code); }
 				}
@@ -1803,15 +1804,15 @@ template <typename Other, typename Arena> constexpr API<Super, Codec>::concat<LH
 
 		if constexpr (!std::is_same_v<Ty, none_t>)
 		{
-			[&]<typename 𝒞𝑜𝒹𝑒𝒸>(const txt<𝒞𝑜𝒹𝑒𝒸>& slice)
+			[&]<typename Impl>(const txt<Impl>& slice)
 			{
-				if constexpr (std::is_same_v<Other, 𝒞𝑜𝒹𝑒𝒸>)
+				if constexpr (std::is_same_v<Other, Impl>)
 				{
-					ptr += detail::__fcopy__<Other, 𝒞𝑜𝒹𝑒𝒸>(slice.head(), slice.tail(), ptr);
+					ptr += detail::__fcopy__<Other, Impl>(slice.head(), slice.tail(), ptr);
 				}
-				if constexpr (!std::is_same_v<Other, 𝒞𝑜𝒹𝑒𝒸>)
+				if constexpr (!std::is_same_v<Other, Impl>)
 				{
-					ptr += detail::__fcopy__<Other, 𝒞𝑜𝒹𝑒𝒸>(slice.head(), slice.tail(), ptr);
+					ptr += detail::__fcopy__<Other, Impl>(slice.head(), slice.tail(), ptr);
 				}
 			}
 			(chunk);
@@ -3621,3 +3622,5 @@ template <typename Codec /* can't own */> struct hash<utf::txt<Codec /*##*/>>
 };
 
 }
+
+// NOLINTEND(*-avoid-c-arrays, *-signed-bitwise, *-union-access, *-magic-numbers, *-bounds-pointer-arithmetic, *-easily-swappable-parameters)

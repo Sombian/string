@@ -22,24 +22,22 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 endif()
 
 # main entry point...
-add_executable(${PROJECT_NAME} src/main.cpp)
+add_executable(${PROJECT_NAME}
+	src/main.cpp
+)
 
 # scan pkg/<module>/<header>
-file(GLOB_RECURSE GIT_SUBMODULE_DIR
+file(GLOB_RECURSE DEPENDENCIES_DIR
+	CONFIGURE_DEPENDS
 	LIST_DIRECTORIES true
-	"${CMAKE_SOURCE_DIR}/pkg/**/*.h"
-	"${CMAKE_SOURCE_DIR}/pkg/**/*.h++"
-	"${CMAKE_SOURCE_DIR}/pkg/**/*.hxx"
-	"${CMAKE_SOURCE_DIR}/pkg/**/*.hpp"
+	"${CMAKE_SOURCE_DIR}/pkg/**/*.h*"
 )
-list(REMOVE_DUPLICATES GIT_SUBMODULE_DIR)
+list(REMOVE_DUPLICATES DEPENDENCIES_DIR)
 
-# include src/ and pkg/<module>/
+# auto-resolve pkg/<module>/
 target_include_directories(${PROJECT_NAME}
-	PUBLIC
-		${CMAKE_SOURCE_DIR}/src
-	PRIVATE
-		${GIT_SUBMODULE_DIR}
+	PRIVATE ${CMAKE_SOURCE_DIR}/src
+	PRIVATE ${DEPENDENCIES_DIR}
 )
 
 # IDE specific flags (VS & VSCode)

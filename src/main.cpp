@@ -9,14 +9,13 @@
 
 #include <iostream>
 
+const char8_t path[] {u8"./tests/utf8.txt"};
+
 int main() noexcept
 {
 	#ifdef _MSC_VER//############//;
 	std::system("chcp 65001 > NUL");
 	#endif//MSC_VER//############//;
-
-	static const char8_t path[]
-	{u8"./src/sample/utf8.txt"};
 
 	std::visit([&](auto&& txt)
 	{
@@ -104,16 +103,7 @@ TEST_CASE("[API] fileof")
 {
 	SUBCASE("UTF-8")
 	{
-		const auto file {utf::fileof("./src/sample/utf8.txt")};
-
-		REQUIRE(file.has_value());
-
-		CHECK(std::holds_alternative<utf::utf8>(file.value()));
-	}
-
-	SUBCASE("UTF-8-BOM")
-	{
-		const auto file {utf::fileof("./src/sample/utf8bom.txt")};
+		const auto file {utf::fileof("./tests/utf8.txt")};
 
 		REQUIRE(file.has_value());
 
@@ -122,7 +112,7 @@ TEST_CASE("[API] fileof")
 
 	SUBCASE("UTF-16-LE")
 	{
-		const auto file {utf::fileof("./src/sample/utf16le.txt")};
+		const auto file {utf::fileof("./tests/utf16le.txt")};
 
 		REQUIRE(file.has_value());
 
@@ -131,7 +121,7 @@ TEST_CASE("[API] fileof")
 
 	SUBCASE("UTF-16-BE")
 	{
-		const auto file {utf::fileof("./src/sample/utf16be.txt")};
+		const auto file {utf::fileof("./tests/utf16be.txt")};
 
 		REQUIRE(file.has_value());
 

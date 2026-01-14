@@ -64,3 +64,18 @@ for (int i {0}; i < len; ++i)
 	// do something with it
 }
 ```
+
+whilst all API works seamlessly with other available encoding encoded string,  
+its best to match the operand's encoding to that of lhs, for greater effciency.  
+
+### ✔️ O(N)
+
+```c++
+utf::utf8 str {u8"hello world"};
+```
+
+### ❌ O(N^2)
+
+```c++
+utf::utf8 str {u"hello world"};
+```
