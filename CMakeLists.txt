@@ -22,7 +22,7 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 endif()
 
 # main entry point...
-add_executable(main src/main.cpp)
+add_executable(${PROJECT_NAME} src/main.cpp)
 
 # scan pkg/<module>/<header>
 file(GLOB_RECURSE GIT_SUBMODULE_DIR
@@ -35,7 +35,7 @@ file(GLOB_RECURSE GIT_SUBMODULE_DIR
 list(REMOVE_DUPLICATES GIT_SUBMODULE_DIR)
 
 # include src/ and pkg/<module>/
-target_include_directories(main
+target_include_directories(${PROJECT_NAME}
 	PUBLIC
 		${CMAKE_SOURCE_DIR}/src
 	PRIVATE
@@ -43,7 +43,7 @@ target_include_directories(main
 )
 
 # IDE specific flags (VS & VSCode)
-set_target_properties(main PROPERTIES
+set_target_properties(${PROJECT_NAME} PROPERTIES
 	VS_GLOBAL_RunCodeAnalysis true
 	VS_GLOBAL_EnableMicrosoftCodeAnalysis true
 	VS_GLOBAL_EnableClangTidyCodeAnalysis true

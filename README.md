@@ -56,7 +56,7 @@ utf::str str {u8"hello world"};
 // time complexity: O(N)
 const auto len {str.length()};
 
-// time complexity: O(N^2)
+// time complexity: O(N)
 for (int i {0}; i < len; ++i)
 {
 	// time complexity: O(N)

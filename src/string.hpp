@@ -62,7 +62,8 @@ inline auto operator<<(std::ostream& os, char32_t code) noexcept -> decltype(os)
 	return os.write(out, unit);
 }
 
-namespace utf {
+namespace utf
+{
 
 #define COPY_ASSIGNMENT(T) constexpr auto operator=(const T& rhs) noexcept -> T&
 #define MOVE_ASSIGNMENT(T) constexpr auto operator=(T&& rhs) noexcept -> T&
@@ -254,15 +255,46 @@ template <typename Super, typename Codec> class API
 			// nothing to do...
 		}
 
-		template <typename Other,
-		          typename Arena>
+		template <typename Other, typename Arena>
 		constexpr operator str<Other, Arena>() const noexcept;
 
-		template <typename Other>
-		constexpr auto operator=(txt<Other> rhs) noexcept -> concat<none_t, decltype(rhs)>;
+		// operators
 
-		template <typename Other>
-		constexpr auto operator+(txt<Other> rhs) noexcept -> concat<concat, decltype(rhs)>;
+		template <typename Other, typename Arena>
+		constexpr auto operator=(__OWNED__(rhs)) noexcept -> concat<none_t, txt<Other>>;
+
+		template <typename Other /* can't own */>
+		constexpr auto operator=(__SLICE__(rhs)) noexcept -> concat<none_t, decltype(rhs)>;
+
+		template <size_t                       N>
+		constexpr auto operator=(__08STR__(rhs)) noexcept -> concat<none_t, txt<codec<"UTF-8">>>;
+
+		template <size_t                       N>
+		constexpr auto operator=(__16STR__(rhs)) noexcept -> concat<none_t, txt<codec<"UTF-16">>>;
+
+		template <size_t                       N>
+		constexpr auto operator=(__32STR__(rhs)) noexcept -> concat<none_t, txt<codec<"UTF-32">>>;
+
+		template <typename Other, typename Arena>
+		constexpr auto operator=(const str<Other, Arena>&& rhs) noexcept -> concat<none_t, str<Other, Arena>>;
+
+		template <typename Other, typename Arena>
+		constexpr auto operator+(__OWNED__(rhs)) noexcept -> concat<concat, txt<Other>>;
+
+		template <typename Other /* can't own */>
+		constexpr auto operator+(__SLICE__(rhs)) noexcept -> concat<concat, decltype(rhs)>;
+
+		template <size_t                       N>
+		constexpr auto operator+(__08STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-8">>>;
+
+		template <size_t                       N>
+		constexpr auto operator+(__16STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-16">>>;
+
+		template <size_t                       N>
+		constexpr auto operator+(__32STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-32">>>;
+
+		template <typename Other, typename Arena>
+		constexpr auto operator+(const str<Other, Arena>&& rhs) noexcept -> concat<concat, str<Other, Arena>>;
 	};
 
 public:
@@ -397,6 +429,62 @@ public:
 	constexpr auto operator+(__16STR__(rhs)) const noexcept -> concat<txt<Codec>, txt<codec<"UTF-16">>> /* encoding of char16_t is trivial */;
 	template <size_t                       N>
 	constexpr auto operator+(__32STR__(rhs)) const noexcept -> concat<txt<Codec>, txt<codec<"UTF-32">>> /* encoding of char32_t is trivial */;
+
+	// reverse operators
+
+	template <size_t N, typename Other, typename Arena>
+	friend constexpr auto operator+(__08STR__(lhs), __OWNED__(rhs)) noexcept -> concat<txt<codec<"UTF-8">>, txt<Other>>
+	{
+		return {{lhs}, {rhs}};
+	}
+
+	template <size_t N, typename Other, typename Arena>
+	friend constexpr auto operator+(__16STR__(lhs), __OWNED__(rhs)) noexcept -> concat<txt<codec<"UTF-16">>, txt<Other>>
+	{
+		return {{lhs}, {rhs}};
+	}
+
+	template <size_t N, typename Other, typename Arena>
+	friend constexpr auto operator+(__32STR__(lhs), __OWNED__(rhs)) noexcept -> concat<txt<codec<"UTF-32">>, txt<Other>>
+	{
+		return {{lhs}, {rhs}};
+	}
+
+	template <size_t N, typename Other /* can't own */>
+	friend constexpr auto operator+(__08STR__(lhs), __SLICE__(rhs)) noexcept -> concat<txt<codec<"UTF-8">>, decltype(rhs)>
+	{
+		return {{lhs}, {rhs}};
+	}
+
+	template <size_t N, typename Other /* can't own */>
+	friend constexpr auto operator+(__16STR__(lhs), __SLICE__(rhs)) noexcept -> concat<txt<codec<"UTF-16">>, decltype(rhs)>
+	{
+		return {{lhs}, {rhs}};
+	}
+
+	template <size_t N, typename Other /* can't own */>
+	friend constexpr auto operator+(__32STR__(lhs), __SLICE__(rhs)) noexcept -> concat<txt<codec<"UTF-32">>, decltype(rhs)>
+	{
+		return {{lhs}, {rhs}};
+	}
+
+	template <size_t N, typename   LHS, typename   RHS>
+	friend constexpr auto operator+(__08STR__(lhs), const concat<LHS, RHS>& rhs) noexcept -> concat<txt<codec<"UTF-8">>, decltype(rhs)>
+	{
+		return {{lhs}, {rhs}};
+	}
+
+	template <size_t N, typename   LHS, typename   RHS>
+	friend constexpr auto operator+(__16STR__(lhs), const concat<LHS, RHS>& rhs) noexcept -> concat<txt<codec<"UTF-16">>, decltype(rhs)>
+	{
+		return {{lhs}, {rhs}};
+	}
+
+	template <size_t N, typename   LHS, typename   RHS>
+	friend constexpr auto operator+(__32STR__(lhs), const concat<LHS, RHS>& rhs) noexcept -> concat<txt<codec<"UTF-32">>, decltype(rhs)>
+	{
+		return {{lhs}, {rhs}};
+	}
 };
 
 template <typename Codec, typename Alloc> class str : public API<str<Codec, Alloc>, Codec>
@@ -1588,37 +1676,37 @@ template <size_t                       N> constexpr auto API<Super, Codec>::oper
 template <typename Super, typename Codec>
 template <typename Other, typename Arena> constexpr auto API<Super, Codec>::operator+(__OWNED__(rhs)) const noexcept -> concat<txt<Codec>, txt<Other>>
 {
-	return {txt<Codec> {this->head(), this->tail()}, txt<Other> {rhs.head(), rhs.tail()}};
+	return {{this->head(), this->tail()}, {rhs.head(), rhs.tail()}};
 }
 
 template <typename Super, typename Codec>
 template <typename Other /* can't own */> constexpr auto API<Super, Codec>::operator+(__SLICE__(rhs)) const noexcept -> concat<txt<Codec>, txt<Other>>
 {
-	return {txt<Codec> {this->head(), this->tail()}, txt<Other> {rhs.head(), rhs.tail()}};
+	return {{this->head(), this->tail()}, {rhs.head(), rhs.tail()}};
 }
 
 template <typename Super, typename Codec>
 template <size_t                       N> constexpr auto API<Super, Codec>::operator+(__EQSTR__(rhs)) const noexcept -> concat<txt<Codec>, txt<Codec>> requires (std::is_same_v<T, char>)
 {
-	return {txt<Codec> {this->head(), this->tail()}, txt<Codec> {&rhs[N - N], &rhs[N - 1]}};
+	return {{this->head(), this->tail()}, {&rhs[N - N], &rhs[N - 1]}};
 }
 
 template <typename Super, typename Codec>
 template <size_t                       N> constexpr auto API<Super, Codec>::operator+(__08STR__(rhs)) const noexcept -> concat<txt<Codec>, txt<codec<"UTF-8">>> /* encoding of char8_t is trivial */
 {
-	return {txt<Codec> {this->head(), this->tail()}, txt<codec<"UTF-8">> {&rhs[N - N], &rhs[N - 1]}};
+	return {{this->head(), this->tail()}, {&rhs[N - N], &rhs[N - 1]}};
 }
 
 template <typename Super, typename Codec>
 template <size_t                       N> constexpr auto API<Super, Codec>::operator+(__16STR__(rhs)) const noexcept -> concat<txt<Codec>, txt<codec<"UTF-16">>> /* encoding of char16_t is trivial */
 {
-	return {txt<Codec> {this->head(), this->tail()}, txt<codec<"UTF-16">> {&rhs[N - N], &rhs[N - 1]}};
+	return {{this->head(), this->tail()}, {&rhs[N - N], &rhs[N - 1]}};
 }
 
 template <typename Super, typename Codec>
 template <size_t                       N> constexpr auto API<Super, Codec>::operator+(__32STR__(rhs)) const noexcept -> concat<txt<Codec>, txt<codec<"UTF-32">>> /* encoding of char32_t is trivial */
 {
-	return {txt<Codec> {this->head(), this->tail()}, txt<codec<"UTF-32">> {&rhs[N - N], &rhs[N - 1]}};
+	return {{this->head(), this->tail()}, {&rhs[N - N], &rhs[N - 1]}};
 }
 
 #pragma endregion CRTP
@@ -1745,16 +1833,86 @@ template <typename   LHS, typename   RHS> constexpr auto API<Super, Codec>::conc
 
 template <typename Super, typename Codec>
 template <typename   LHS, typename   RHS>
-template <typename Other /* can't own */> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator=(txt<Other> rhs) noexcept -> concat<none_t, decltype(rhs)>
+template <typename Other, typename Arena> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator=(__OWNED__(rhs)) noexcept -> concat<none_t, txt<Other>>
 {
-	return {69'74, rhs};
+	return {69'74, {rhs}};
 }
 
 template <typename Super, typename Codec>
 template <typename   LHS, typename   RHS>
-template <typename Other /* can't own */> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator+(txt<Other> rhs) noexcept -> concat<concat, decltype(rhs)>
+template <typename Other /* can't own */> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator=(__SLICE__(rhs)) noexcept -> concat<none_t, decltype(rhs)>
 {
-	return {*this, rhs};
+	return {69'74, {rhs}};
+}
+
+template <typename Super, typename Codec>
+template <typename   LHS, typename   RHS>
+template <size_t                       N> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator=(__08STR__(rhs)) noexcept -> concat<none_t, txt<codec<"UTF-8">>>
+{
+	return {69'74, {rhs}};
+}
+
+template <typename Super, typename Codec>
+template <typename   LHS, typename   RHS>
+template <size_t                       N> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator=(__16STR__(rhs)) noexcept -> concat<none_t, txt<codec<"UTF-16">>>
+{
+	return {69'74, {rhs}};
+}
+
+template <typename Super, typename Codec>
+template <typename   LHS, typename   RHS>
+template <size_t                       N> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator=(__32STR__(rhs)) noexcept -> concat<none_t, txt<codec<"UTF-32">>>
+{
+	return {69'74, {rhs}};
+}
+
+template <typename Super, typename Codec>
+template <typename   LHS, typename   RHS>
+template <typename Other, typename Arena> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator=(const str<Other, Arena>&& rhs) noexcept -> concat<none_t, str<Other, Arena>>
+{
+	return {69'74, {rhs}};
+}
+
+template <typename Super, typename Codec>
+template <typename   LHS, typename   RHS>
+template <typename Other, typename Arena> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator+(__OWNED__(rhs)) noexcept -> concat<concat, txt<Other>>
+{
+	return {*this, {rhs}};
+}
+
+template <typename Super, typename Codec>
+template <typename   LHS, typename   RHS>
+template <typename Other /* can't own */> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator+(__SLICE__(rhs)) noexcept -> concat<concat, decltype(rhs)>
+{
+	return {*this, {rhs}};
+}
+
+template <typename Super, typename Codec>
+template <typename   LHS, typename   RHS>
+template <size_t                       N> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator+(__08STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-8">>>
+{
+	return {*this, {rhs}};
+}
+
+template <typename Super, typename Codec>
+template <typename   LHS, typename   RHS>
+template <size_t                       N> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator+(__16STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-16">>>
+{
+	return {*this, {rhs}};
+}
+
+template <typename Super, typename Codec>
+template <typename   LHS, typename   RHS>
+template <size_t                       N> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator+(__32STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-32">>>
+{
+	return {*this, {rhs}};
+}
+
+template <typename Super, typename Codec>
+template <typename   LHS, typename   RHS>
+template <typename Other, typename Arena> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator+(const str<Other, Arena>&& rhs) noexcept -> concat<concat, str<Other, Arena>>
+{
+	return {*this, {rhs}};
 }
 
 #pragma endregion CRTP::concat
@@ -3429,4 +3587,37 @@ template <size_t N> txt(const char8_t (&_)[N]) -> txt<codec<"UTF-8">>;
 template <size_t N> txt(const char16_t (&_)[N]) -> txt<codec<"UTF-16">>;
 template <size_t N> txt(const char32_t (&_)[N]) -> txt<codec<"UTF-32">>;
 
-} // namespace utf
+}
+
+namespace std
+{
+
+template <typename Codec, typename Alloc> struct hash<utf::str<Codec, Alloc>>
+{
+	constexpr auto operator()(const utf::str<Codec, Alloc>& str) const noexcept -> size_t
+	{
+		uint32_t seed {0};
+
+		for (const auto code : str)
+		{
+			seed = 31 * seed + code;
+		}
+		return static_cast<size_t>(seed);
+	}
+};
+
+template <typename Codec /* can't own */> struct hash<utf::txt<Codec /*##*/>>
+{
+	constexpr auto operator()(const utf::txt<Codec /*##*/>& str) const noexcept -> size_t
+	{
+		uint32_t seed {0};
+
+		for (const auto code : str)
+		{
+			seed = 31 * seed + code;
+		}
+		return static_cast<size_t>(seed);
+	}
+};
+
+}

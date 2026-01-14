@@ -1,7 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <variant>
 #include <cstdlib>
+#include <variant>
 
 #include "string.hpp"
 
@@ -52,8 +52,8 @@ TEST_CASE("[API] string")
 		CHECK(미수.starts_with(미수));
 		CHECK(미수.ends_with(u"미수"));
 
-		utf::utf8 티라미수 {티라 + 미수};
-		utf::utf8 티라티라 {티라 + 티라};
+		utf::utf8 티라미수 {u"티라" + 미수};
+		utf::utf8 티라티라 {u"티라" + 티라};
 
 		CHECK(티라미수 == u8"티라미수");
 		CHECK(티라미수.length() == 4);
