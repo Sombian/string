@@ -1,18 +1,17 @@
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include <cstdlib>
+#include <ranges>
 #include <variant>
+#include <iostream>
+#include <algorithm>
 
 #include "string.hpp"
 
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #ifndef DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
-#include <iostream>
-
-const char8_t path[] {u8"./tests/utf8.txt"};
 
 int main() noexcept
 {
+	const char8_t path[] {u8"./tests/utf8.txt"};
+
 	#ifdef _MSC_VER//############//;
 	std::system("chcp 65001 > NUL");
 	#endif//MSC_VER//############//;
@@ -22,14 +21,22 @@ int main() noexcept
 		std::cout << txt << '\n';
 	},
 	utf::fileof(path).value());
-}
-#endif
 
+	utf::str str {u8"두쫀쿠뵥뵥"};
+
+	std::for_each(str.rbegin(), str.rend(), [](auto code) { std::cout << code; }); std::cout << '\n';
+
+	for (auto [index, value] : std::views::enumerate(str)) { if (index % 2 == 0) { value = U'뷁'; } }
+
+	std::for_each(str.rbegin(), str.rend(), [](auto code) { std::cout << code; }); std::cout << '\n';
+}
+
+#endif//DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #ifdef DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest.h"
 
-TEST_CASE("[API] string")
+TEST_CASE("string")
 {
 	SUBCASE("SSO23")
 	{
@@ -99,7 +106,7 @@ TEST_CASE("[API] string")
 	}
 }
 
-TEST_CASE("[API] fileof")
+TEST_CASE("fileof")
 {
 	SUBCASE("UTF-8")
 	{
@@ -128,4 +135,5 @@ TEST_CASE("[API] fileof")
 		CHECK(std::holds_alternative<utf::utf16>(file.value()));
 	}
 }
-#endif
+
+#endif//DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN

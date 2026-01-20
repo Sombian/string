@@ -1,5 +1,3 @@
-// NOLINTBEGIN(*-avoid-c-arrays, *-signed-bitwise, *-union-access, *-magic-numbers, *-bounds-pointer-arithmetic, *-easily-swappable-parameters)
-
 #pragma once
 
 #include <cassert>
@@ -8,6 +6,7 @@
 
 #include <bit>
 #include <ios>
+#include <tuple>
 #include <memory>
 #include <vector>
 #include <variant>
@@ -16,8 +15,10 @@
 #include <fstream>
 #include <iterator>
 #include <optional>
+#include <concepts>
 #include <algorithm>
 #include <filesystem>
+#include <type_traits>
 
 //┌────────────────────────────────────────────────────────────────────────────────┐
 //│         _          _            _            _          _             _        │
@@ -67,11 +68,11 @@ inline auto operator<<(std::ostream& os, char32_t code) noexcept -> decltype(os)
 namespace utf
 {
 
-#define COPY_ASSIGNMENT(T) constexpr auto operator=(const T& rhs) noexcept -> T&
-#define MOVE_ASSIGNMENT(T) constexpr auto operator=(T&& rhs) noexcept -> T&
-
-#define COPY_CONSTRUCTOR(T) constexpr T(const T& other) noexcept
-#define MOVE_CONSTRUCTOR(T) constexpr T(T&& other) noexcept
+template <typename T, size_t N> using get_arg_t // extracts nth template argument from given T; amazingly useful
+=
+typename decltype([]<template <typename...> typename Type, typename... Args> (Type<Args...>*) consteval noexcept
+->
+std::type_identity<std::tuple_element_t<N, std::tuple<Args...>>>{ return {}; } (static_cast<T*>(nullptr)))::type;
 
 //┌──────────────────────────────────────────────────────────────┐
 //│ special thanks to facebook's folly::FBString.                │
@@ -82,8 +83,22 @@ namespace utf
 //│ for more, watch https://www.youtube.com/watch?v=kPR8h4-qZdk. │
 //└──────────────────────────────────────────────────────────────┘
 
-template <typename Codec, typename Alloc = std::allocator<typename Codec::T>> class str; // aka c_str
-template <typename Codec /* slice is a not-owning view of ptr<const unit> */> class txt; // aka slice
+#define COPY_ASSIGNMENT(T) constexpr auto operator=(const T& rhs) noexcept -> T&
+#define MOVE_ASSIGNMENT(T) constexpr auto operator=(T&& rhs) noexcept -> T&
+
+#define COPY_CONSTRUCTOR(T) constexpr T(const T& other) noexcept
+#define MOVE_CONSTRUCTOR(T) constexpr T(T&& other) noexcept
+
+//┌───────┬───────┬────────────┬─────────────────┐
+//│ class │ owns? │ null-term? │ use-after-free? │
+//├───────┼───────┼────────────┼─────────────────┤
+//│ [str] │   T   │   always   │      safe       │
+//├───────┼───────┼────────────┼─────────────────┤
+//│ [txt] │   F   │   maybe?   │      [UB]       │
+//└───────┴───────┴────────────┴─────────────────┘
+
+/* owns str */ template <typename Codec, typename Alloc = std::allocator<typename Codec::T>> class str;
+/* str view */ template <typename Codec /* slice is a not-owning view of ptr<const unit> */> class txt;
 
 #define __OWNED__(name) const str<Other, Arena>& name
 #define __SLICE__(name) const txt<Other /*##*/>  name
@@ -191,114 +206,40 @@ template <> struct codec<"UTF-32">
 	decode(const T* in, char32_t& out, int8_t size) noexcept -> void;
 };
 
-template <typename Super, typename Codec> class API
+template <typename Class /* CRTP core */> class API
 {
-	template <typename, typename> friend class API;
+	template <typename> friend class API;
 
-	typedef typename Codec::T T;
+	   using Codec = get_arg_t<Class, 0>;
+	// using Alloc = get_arg_t<Class, 1>;
+
+	using T = typename Codec::T;
+
+	//┌────────────────────────────────────────────────┐
+	//│ note: helper funcs are not encapsulated within │
+	//│       and it was deliberate; to cut bin bloat. │
+	//└────────────────────────────────────────────────┘
+
+	// stl compat? expr template
+	template <typename LHS, typename RHS> class concat;
+	// stl compat; bi-directional
+	class const_forward_iterator;
+	// stl compat; bi-directional
+	class /*&*/ forward_iterator;
+	// stl compat; bi-directional
+	class const_reverse_iterator;
+	// stl compat; bi-directional
+	class /*&*/ reverse_iterator;
 
 	constexpr auto head() const noexcept -> const T*;
 	constexpr auto tail() const noexcept -> const T*;
 
-	/* bidirectional iterator; awesome */ class cursor
-	{
-		const T* ptr;
-
-	public:
-
-		using iterator_category = std::bidirectional_iterator_tag;
-		// for STL algorithms; itrator trait
-		using difference_type = ptrdiff_t;
-		using value_type = char32_t;
-		using reference = char32_t;
-		using pointer = const T*;
-
-		constexpr cursor
-		(
-			decltype(ptr) ptr
-			=
-			nullptr // for STL
-		)
-		noexcept : ptr(ptr) {}
-
-		constexpr auto operator*() const noexcept -> char32_t;
-		constexpr auto operator&() const noexcept -> const T*;
-
-		constexpr auto operator++(   ) noexcept -> cursor&;
-		constexpr auto operator++(int) noexcept -> cursor;
-
-		constexpr auto operator--(   ) noexcept -> cursor&;
-		constexpr auto operator--(int) noexcept -> cursor;
-
-		constexpr auto operator==(const cursor& rhs) const noexcept -> bool;
-		constexpr auto operator!=(const cursor& rhs) const noexcept -> bool;
-	};
-
-	template <typename LHS, typename RHS> class concat
-	{
-		typedef short none_t;
-		
-		const LHS lhs;
-		const RHS rhs;
-		
-		constexpr auto __for_each__(const auto&& fun) const noexcept -> void;
-
-	public:
-
-		constexpr concat
-		(
-			decltype(lhs) lhs,
-			decltype(rhs) rhs
-		)
-		noexcept : lhs {lhs},
-		           rhs {rhs}
-		{
-			// nothing to do...
-		}
-
-		template <typename Other, typename Arena>
-		constexpr operator str<Other, Arena>() const noexcept;
-
-		// operators
-
-		template <typename Other, typename Arena>
-		constexpr auto operator=(__OWNED__(rhs)) noexcept -> concat<none_t, txt<Other>>;
-
-		template <typename Other /* can't own */>
-		constexpr auto operator=(__SLICE__(rhs)) noexcept -> concat<none_t, decltype(rhs)>;
-
-		template <size_t                       N>
-		constexpr auto operator=(__08STR__(rhs)) noexcept -> concat<none_t, txt<codec<"UTF-8">>>;
-
-		template <size_t                       N>
-		constexpr auto operator=(__16STR__(rhs)) noexcept -> concat<none_t, txt<codec<"UTF-16">>>;
-
-		template <size_t                       N>
-		constexpr auto operator=(__32STR__(rhs)) noexcept -> concat<none_t, txt<codec<"UTF-32">>>;
-
-		template <typename Other, typename Arena>
-		constexpr auto operator=(const str<Other, Arena>&& rhs) noexcept -> concat<none_t, str<Other, Arena>>;
-
-		template <typename Other, typename Arena>
-		constexpr auto operator+(__OWNED__(rhs)) noexcept -> concat<concat, txt<Other>>;
-
-		template <typename Other /* can't own */>
-		constexpr auto operator+(__SLICE__(rhs)) noexcept -> concat<concat, decltype(rhs)>;
-
-		template <size_t                       N>
-		constexpr auto operator+(__08STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-8">>>;
-
-		template <size_t                       N>
-		constexpr auto operator+(__16STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-16">>>;
-
-		template <size_t                       N>
-		constexpr auto operator+(__32STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-32">>>;
-
-		template <typename Other, typename Arena>
-		constexpr auto operator+(const str<Other, Arena>&& rhs) noexcept -> concat<concat, str<Other, Arena>>;
-	};
-
 public:
+
+	using const_forward_iterator_t = const_forward_iterator;
+	using /*&*/ forward_iterator_t = /*&*/ forward_iterator;
+	using const_reverse_iterator_t = const_reverse_iterator;
+	using /*&*/ reverse_iterator_t = /*&*/ reverse_iterator;
 	
 	// returns the number of code units, excluding NULL-TERMINATOR.
 	constexpr auto size() const noexcept -> size_t;
@@ -384,8 +325,11 @@ public:
 
 	// iterator
 
-	constexpr auto begin() const noexcept -> cursor;
-	constexpr auto end() const noexcept -> cursor;
+	constexpr auto begin() const noexcept -> const_forward_iterator;
+	constexpr auto end() const noexcept -> const_forward_iterator;
+
+	constexpr auto rbegin() const noexcept -> const_reverse_iterator;
+	constexpr auto rend() const noexcept -> const_reverse_iterator;
 
 	// operators
 
@@ -433,70 +377,334 @@ public:
 
 	// reverse operators
 
-	template <size_t N, typename Other, typename Arena>
+	template <size_t                       N,
+	          typename Other, typename Arena>
 	friend constexpr auto operator+(__08STR__(lhs), __OWNED__(rhs)) noexcept -> concat<txt<codec<"UTF-8">>, txt<Other>>
 	{
 		return {{lhs}, {rhs}};
 	}
 
-	template <size_t N, typename Other, typename Arena>
+	template <size_t                       N,
+	          typename Other, typename Arena>
 	friend constexpr auto operator+(__16STR__(lhs), __OWNED__(rhs)) noexcept -> concat<txt<codec<"UTF-16">>, txt<Other>>
 	{
 		return {{lhs}, {rhs}};
 	}
 
-	template <size_t N, typename Other, typename Arena>
+	template <size_t                       N,
+	          typename Other, typename Arena>
 	friend constexpr auto operator+(__32STR__(lhs), __OWNED__(rhs)) noexcept -> concat<txt<codec<"UTF-32">>, txt<Other>>
 	{
 		return {{lhs}, {rhs}};
 	}
 
-	template <size_t N, typename Other /* can't own */>
-	friend constexpr auto operator+(__08STR__(lhs), __SLICE__(rhs)) noexcept -> concat<txt<codec<"UTF-8">>, decltype(rhs)>
+	template <size_t                       N,
+	          typename Other /* can't own */>
+	friend constexpr auto operator+(__08STR__(lhs), __SLICE__(rhs)) noexcept -> concat<txt<codec<"UTF-8">>, txt<Other>>
 	{
 		return {{lhs}, {rhs}};
 	}
 
-	template <size_t N, typename Other /* can't own */>
-	friend constexpr auto operator+(__16STR__(lhs), __SLICE__(rhs)) noexcept -> concat<txt<codec<"UTF-16">>, decltype(rhs)>
+	template <size_t                       N,
+	          typename Other /* can't own */>
+	friend constexpr auto operator+(__16STR__(lhs), __SLICE__(rhs)) noexcept -> concat<txt<codec<"UTF-16">>, txt<Other>>
 	{
 		return {{lhs}, {rhs}};
 	}
 
-	template <size_t N, typename Other /* can't own */>
-	friend constexpr auto operator+(__32STR__(lhs), __SLICE__(rhs)) noexcept -> concat<txt<codec<"UTF-32">>, decltype(rhs)>
+	template <size_t                       N,
+	          typename Other /* can't own */>
+	friend constexpr auto operator+(__32STR__(lhs), __SLICE__(rhs)) noexcept -> concat<txt<codec<"UTF-32">>, txt<Other>>
 	{
 		return {{lhs}, {rhs}};
 	}
 
-	template <size_t N, typename   LHS, typename   RHS>
-	friend constexpr auto operator+(__08STR__(lhs), const concat<LHS, RHS>& rhs) noexcept -> concat<txt<codec<"UTF-8">>, decltype(rhs)>
+	template <size_t                       N,
+	          typename   LHS, typename   RHS>
+	friend constexpr auto operator+(__08STR__(lhs), const concat<LHS, RHS>& rhs) noexcept -> concat<txt<codec<"UTF-8">>, concat<LHS, RHS>>
 	{
 		return {{lhs}, {rhs}};
 	}
 
-	template <size_t N, typename   LHS, typename   RHS>
-	friend constexpr auto operator+(__16STR__(lhs), const concat<LHS, RHS>& rhs) noexcept -> concat<txt<codec<"UTF-16">>, decltype(rhs)>
+	template <size_t                       N,
+	          typename   LHS, typename   RHS>
+	friend constexpr auto operator+(__16STR__(lhs), const concat<LHS, RHS>& rhs) noexcept -> concat<txt<codec<"UTF-16">>, concat<LHS, RHS>>
 	{
 		return {{lhs}, {rhs}};
 	}
 
-	template <size_t N, typename   LHS, typename   RHS>
-	friend constexpr auto operator+(__32STR__(lhs), const concat<LHS, RHS>& rhs) noexcept -> concat<txt<codec<"UTF-32">>, decltype(rhs)>
+	template <size_t                       N,
+	          typename   LHS, typename   RHS>
+	friend constexpr auto operator+(__32STR__(lhs), const concat<LHS, RHS>& rhs) noexcept -> concat<txt<codec<"UTF-32">>, concat<LHS, RHS>>
 	{
 		return {{lhs}, {rhs}};
 	}
+
+private:
+
+	template <typename LHS, typename RHS> class concat
+	{
+		using blank_t = txt<codec<"ASCII">>;
+
+		const LHS lhs;
+		const RHS rhs;
+		
+		constexpr auto __for_each__(const auto&& fun) const noexcept -> void;
+
+	public:
+
+		constexpr concat
+		(
+			decltype(lhs) lhs,
+			decltype(rhs) rhs
+		)
+		noexcept : lhs {lhs},
+		           rhs {rhs}
+		{
+			// nothing to do...
+		}
+
+		template <typename Other,
+		          typename Arena>
+		constexpr operator str<Other, Arena>() const noexcept;
+
+		// operators
+
+		template <typename Other, typename Arena>
+		constexpr auto operator=(__OWNED__(rhs)) noexcept -> concat<blank_t, txt<Other>>;
+
+		template <typename Other /* can't own */>
+		constexpr auto operator=(__SLICE__(rhs)) noexcept -> concat<blank_t, txt<Other>>;
+
+		template <size_t                       N>
+		constexpr auto operator=(__08STR__(rhs)) noexcept -> concat<blank_t, txt<codec<"UTF-8">>>;
+
+		template <size_t                       N>
+		constexpr auto operator=(__16STR__(rhs)) noexcept -> concat<blank_t, txt<codec<"UTF-16">>>;
+
+		template <size_t                       N>
+		constexpr auto operator=(__32STR__(rhs)) noexcept -> concat<blank_t, txt<codec<"UTF-32">>>;
+
+		template <typename Other, typename Arena>
+		constexpr auto operator+(__OWNED__(rhs)) noexcept -> concat<concat, txt<Other>>;
+
+		template <typename Other /* can't own */>
+		constexpr auto operator+(__SLICE__(rhs)) noexcept -> concat<concat, txt<Other>>;
+
+		template <size_t                       N>
+		constexpr auto operator+(__08STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-8">>>;
+
+		template <size_t                       N>
+		constexpr auto operator+(__16STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-16">>>;
+
+		template <size_t                       N>
+		constexpr auto operator+(__32STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-32">>>;
+	};
+
+	class const_forward_iterator
+	{
+		const T* ptr;
+
+	public:
+
+		using iterator_category = std::bidirectional_iterator_tag;
+		// for STL algorithms; itrator trait
+		using difference_type = ptrdiff_t;
+		using value_type = char32_t;
+		using reference = char32_t;
+		using pointer = const T*;
+
+		constexpr const_forward_iterator
+		(
+			decltype(ptr) ptr
+			=
+			nullptr // for STL
+		)
+		noexcept : ptr {ptr} {}
+
+		constexpr auto operator*() const noexcept -> value_type;
+
+		constexpr auto operator++(   ) noexcept -> decltype(*this)&;
+		constexpr auto operator++(int) noexcept -> decltype(*this);
+
+		constexpr auto operator--(   ) noexcept -> decltype(*this)&;
+		constexpr auto operator--(int) noexcept -> decltype(*this);
+
+		constexpr auto operator+(size_t value) noexcept -> decltype(*this);
+		constexpr auto operator+=(size_t value) noexcept -> decltype(*this)&;
+
+		constexpr auto operator-(size_t value) noexcept -> decltype(*this);
+		constexpr auto operator-=(size_t value) noexcept -> decltype(*this)&;
+
+		constexpr auto operator==(const const_forward_iterator& rhs) const noexcept -> bool = default;
+		constexpr auto operator!=(const const_forward_iterator& rhs) const noexcept -> bool = default;
+	};
+
+	class /*&*/ forward_iterator
+	{
+		T* ptr;
+
+		class unicode
+		{
+			T* const ptr;
+
+		public:
+
+			constexpr unicode
+			(
+				decltype(ptr) ptr
+			)
+			noexcept : ptr {ptr} {}
+
+			[[nodiscard]] constexpr operator char32_t() const noexcept;
+			constexpr auto operator=(char32_t code) noexcept -> unicode&;
+
+			constexpr auto operator==(char32_t code) const noexcept -> bool;
+			constexpr auto operator!=(char32_t code) const noexcept -> bool;
+		};
+
+	public:
+
+		using iterator_category = std::bidirectional_iterator_tag;
+		// for STL algorithms; itrator trait
+		using difference_type = ptrdiff_t;
+		using value_type = unicode;
+		using reference = unicode;
+		using pointer = const T*;
+
+		constexpr forward_iterator
+		(
+			decltype(ptr) ptr
+			=
+			nullptr // for STL
+		)
+		noexcept : ptr {ptr} {}
+
+		constexpr auto operator*() const noexcept -> value_type;
+
+		constexpr auto operator++(   ) noexcept -> decltype(*this)&;
+		constexpr auto operator++(int) noexcept -> decltype(*this);
+
+		constexpr auto operator--(   ) noexcept -> decltype(*this)&;
+		constexpr auto operator--(int) noexcept -> decltype(*this);
+
+		constexpr auto operator+(size_t value) noexcept -> decltype(*this);
+		constexpr auto operator+=(size_t value) noexcept -> decltype(*this)&;
+
+		constexpr auto operator-(size_t value) noexcept -> decltype(*this);
+		constexpr auto operator-=(size_t value) noexcept -> decltype(*this)&;
+
+		constexpr auto operator==(const forward_iterator& rhs) const noexcept -> bool = default;
+		constexpr auto operator!=(const forward_iterator& rhs) const noexcept -> bool = default;
+	};
+
+	class const_reverse_iterator
+	{
+		const T* ptr;
+
+	public:
+
+		using iterator_category = std::bidirectional_iterator_tag;
+		// for STL algorithms; itrator trait
+		using difference_type = ptrdiff_t;
+		using value_type = char32_t;
+		using reference = char32_t;
+		using pointer = const T*;
+
+		constexpr const_reverse_iterator
+		(
+			decltype(ptr) ptr
+			=
+			nullptr // for STL
+		)
+		noexcept : ptr {ptr} {}
+
+		constexpr auto operator*() const noexcept -> value_type;
+
+		constexpr auto operator++(   ) noexcept -> decltype(*this)&;
+		constexpr auto operator++(int) noexcept -> decltype(*this);
+
+		constexpr auto operator--(   ) noexcept -> decltype(*this)&;
+		constexpr auto operator--(int) noexcept -> decltype(*this);
+
+		constexpr auto operator+(size_t value) noexcept -> decltype(*this);
+		constexpr auto operator+=(size_t value) noexcept -> decltype(*this)&;
+
+		constexpr auto operator-(size_t value) noexcept -> decltype(*this);
+		constexpr auto operator-=(size_t value) noexcept -> decltype(*this)&;
+
+		constexpr auto operator==(const const_reverse_iterator& rhs) const noexcept -> bool = default;
+		constexpr auto operator!=(const const_reverse_iterator& rhs) const noexcept -> bool = default;
+	};
+
+	class /*&*/ reverse_iterator
+	{
+		T* ptr;
+
+		class unicode
+		{
+			T* const ptr;
+
+		public:
+
+			constexpr unicode
+			(
+				decltype(ptr) ptr
+			)
+			noexcept : ptr {ptr} {}
+
+			[[nodiscard]] constexpr operator char32_t() const noexcept;
+			constexpr auto operator=(char32_t code) noexcept -> unicode&;
+
+			constexpr auto operator==(char32_t code) const noexcept -> bool;
+			constexpr auto operator!=(char32_t code) const noexcept -> bool;
+		};
+
+	public:
+
+		using iterator_category = std::bidirectional_iterator_tag;
+		// for STL algorithms; itrator trait
+		using difference_type = ptrdiff_t;
+		using value_type = unicode;
+		using reference = unicode;
+		using pointer = const T*;
+
+		constexpr reverse_iterator
+		(
+			decltype(ptr) ptr
+			=
+			nullptr // for STL
+		)
+		noexcept : ptr {ptr} {}
+
+		constexpr auto operator*() const noexcept -> value_type;
+
+		constexpr auto operator++(   ) noexcept -> decltype(*this)&;
+		constexpr auto operator++(int) noexcept -> decltype(*this);
+
+		constexpr auto operator--(   ) noexcept -> decltype(*this)&;
+		constexpr auto operator--(int) noexcept -> decltype(*this);
+
+		constexpr auto operator+(size_t value) noexcept -> decltype(*this);
+		constexpr auto operator+=(size_t value) noexcept -> decltype(*this)&;
+
+		constexpr auto operator-(size_t value) noexcept -> decltype(*this);
+		constexpr auto operator-=(size_t value) noexcept -> decltype(*this)&;
+
+		constexpr auto operator==(const reverse_iterator& rhs) const noexcept -> bool = default;
+		constexpr auto operator!=(const reverse_iterator& rhs) const noexcept -> bool = default;
+	};
 };
 
-template <typename Codec, typename Alloc> class str : public API<str<Codec, Alloc>, Codec>
+template <typename Codec, typename Alloc> class str : public API<str<Codec, Alloc>>
 {
-	template <typename, typename> friend class str;
-	template <typename  /*none*/> friend class txt;
-	template <typename, typename> friend class API;
+	template <typename /*none*/> friend class API;
+	template <typename,typename> friend class str;
+	template <typename /*none*/> friend class txt;
 
-	typedef std::allocator_traits<Alloc> allocator;
+	using allocator = std::allocator_traits<Alloc>;
 
-	typedef typename Codec::T T;
+	using T = typename Codec::T;
 
 	#define IS_BIG          \
 	(                       \
@@ -577,58 +785,8 @@ template <typename Codec, typename Alloc> class str : public API<str<Codec, Allo
 
 	storage store;
 
-	class reader
-	{
-		const str* src;
-		const size_t arg;
-
-	public:
-
-		constexpr reader
-		(
-			decltype(src) src,
-			decltype(arg) arg
-		)
-		noexcept : src {src},
-		           arg {arg}
-		{
-			// nothing to do...
-		}
-
-		[[nodiscard]] constexpr operator char32_t() const noexcept;
-
-		constexpr auto operator==(char32_t code) const noexcept -> bool;
-		constexpr auto operator!=(char32_t code) const noexcept -> bool;
-	};
-
-	class writer
-	{
-		/*&*/ str* src;
-		const size_t arg;
-
-	public:
-
-		constexpr writer
-		(
-			decltype(src) src,
-			decltype(arg) arg
-		)
-		noexcept : src {src},
-		           arg {arg}
-		{
-			// nothing to do...
-		}
-
-		constexpr auto operator=(char32_t code) noexcept -> writer&;
-		
-		[[nodiscard]] constexpr operator char32_t() const noexcept;
-
-		constexpr auto operator==(char32_t code) const noexcept -> bool;
-		constexpr auto operator!=(char32_t code) const noexcept -> bool;
-	};
-
-	friend reader; typedef reader reader;
-	friend writer; typedef writer writer;
+	friend class reader;
+	friend class writer;
 
 	// series of sanity checks
 	static_assert(sizeof(storage) == sizeof(buffer));
@@ -666,7 +824,8 @@ public:
 
 	// constructors
 
-	constexpr str() noexcept = default;
+	constexpr  str() noexcept = default;
+	constexpr ~str() noexcept = default;
 
 	template <typename Other, typename Arena>
 	constexpr str(__OWNED__(str)) noexcept;
@@ -685,6 +844,20 @@ public:
 	constexpr auto capacity(/* getter */) const noexcept -> size_t;
 	// changes the number of code units it can hold, excluding NULL-TERMINATOR.
 	constexpr auto capacity(size_t value) /*&*/ noexcept -> void;
+
+	// iterator
+
+	using API<str<Codec, Alloc>>::begin; // fix; name hiding
+	using API<str<Codec, Alloc>>::end; // fix; name hiding
+
+	constexpr auto begin() /*&*/ noexcept -> typename str::forward_iterator_t;
+	constexpr auto end() /*&*/ noexcept -> typename str::forward_iterator_t;
+
+	using API<str<Codec, Alloc>>::rbegin; // fix; name hiding
+	using API<str<Codec, Alloc>>::rend; // fix; name hiding
+
+	constexpr auto rbegin() /*&*/ noexcept -> typename str::reverse_iterator_t;
+	constexpr auto rend() /*&*/ noexcept -> typename str::reverse_iterator_t;
 
 	// operators
 
@@ -742,27 +915,9 @@ public:
 
 private:
 
-	template <typename Other>
-	constexpr auto __assign__(const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> void;
-
-	template <typename Other>
-	constexpr auto __concat__(const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> void;
-};
-
-template <typename Codec /* can't own */> class txt : public API<txt<Codec /*##*/>, Codec>
-{
-	template <typename, typename> friend class str;
-	template <typename  /*none*/> friend class txt;
-	template <typename, typename> friend class API;
-
-	typedef typename Codec::T T;
-
-	const T* __head__;
-	const T* __tail__;
-
 	class reader
 	{
-		const txt* src;
+		const str* src;
 		const size_t arg;
 
 	public:
@@ -786,7 +941,7 @@ template <typename Codec /* can't own */> class txt : public API<txt<Codec /*##*
 
 	class writer
 	{
-		/*&*/ txt* src;
+		/*&*/ str* src;
 		const size_t arg;
 
 	public:
@@ -802,7 +957,7 @@ template <typename Codec /* can't own */> class txt : public API<txt<Codec /*##*
 			// nothing to do...
 		}
 
-		// constexpr auto operator=(char32_t code) noexcept -> writer&;
+		constexpr auto operator=(char32_t code) noexcept -> writer&;
 		
 		[[nodiscard]] constexpr operator char32_t() const noexcept;
 
@@ -810,8 +965,26 @@ template <typename Codec /* can't own */> class txt : public API<txt<Codec /*##*
 		constexpr auto operator!=(char32_t code) const noexcept -> bool;
 	};
 
-	friend reader; typedef reader reader;
-	friend writer; typedef writer writer;
+	template <typename Other>
+	constexpr auto __assign__(const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> void;
+
+	template <typename Other>
+	constexpr auto __concat__(const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> void;
+};
+
+template <typename Codec /* can't own */> class txt : public API<txt<Codec /*##*/>>
+{
+	template <typename /*none*/> friend class API;
+	template <typename,typename> friend class str;
+	template <typename /*none*/> friend class txt;
+
+	using T = typename Codec::T;
+
+	const T* __head__;
+	const T* __tail__;
+
+	friend class reader;
+	friend class writer;
 
 public:
 
@@ -877,6 +1050,61 @@ public:
 
 	COPY_ASSIGNMENT(txt) = default;
 	MOVE_ASSIGNMENT(txt) = default;
+
+	constexpr  txt() noexcept = delete;
+	constexpr ~txt() noexcept = default;
+
+private:
+
+	class reader
+	{
+		const txt* src;
+		const size_t arg;
+
+	public:
+
+		constexpr reader
+		(
+			decltype(src) src,
+			decltype(arg) arg
+		)
+		noexcept : src {src},
+		           arg {arg}
+		{
+			// nothing to do...
+		}
+
+		[[nodiscard]] constexpr operator char32_t() const noexcept;
+
+		constexpr auto operator==(char32_t code) const noexcept -> bool;
+		constexpr auto operator!=(char32_t code) const noexcept -> bool;
+	};
+
+	class writer
+	{
+		/*&*/ txt* src;
+		const size_t arg;
+
+	public:
+
+		constexpr writer
+		(
+			decltype(src) src,
+			decltype(arg) arg
+		)
+		noexcept : src {src},
+		           arg {arg}
+		{
+			// nothing to do...
+		}
+
+		// constexpr auto operator=(char32_t code) noexcept -> writer&;
+		
+		[[nodiscard]] constexpr operator char32_t() const noexcept;
+
+		constexpr auto operator==(char32_t code) const noexcept -> bool;
+		constexpr auto operator!=(char32_t code) const noexcept -> bool;
+	};
 };
 
 namespace detail
@@ -964,17 +1192,17 @@ template <typename Other /* can't own */> inline auto operator<<(std::ostream& o
 #pragma endregion iostream
 #pragma region codec<"ASCII">
 
-constexpr auto codec<"ASCII">::size(char32_t code) noexcept -> int8_t
+constexpr auto codec<"ASCII">::size([[maybe_unused]] char32_t code) noexcept -> int8_t
 {
 	return 1;
 }
 
-constexpr auto codec<"ASCII">::next(const T* data) noexcept -> int8_t
+constexpr auto codec<"ASCII">::next([[maybe_unused]] const T* data) noexcept -> int8_t
 {
 	return +1;
 }
 
-constexpr auto codec<"ASCII">::back(const T* data) noexcept -> int8_t
+constexpr auto codec<"ASCII">::back([[maybe_unused]] const T* data) noexcept -> int8_t
 {
 	return -1;
 }
@@ -1020,7 +1248,7 @@ constexpr auto codec<"ASCII">::decode(const T* in, char32_t& out, int8_t size) n
 #pragma endregion codec<"ASCII">
 #pragma region codec<"UTF-8">
 
-constexpr auto codec<"UTF-8">::size(char32_t code) noexcept -> int8_t
+constexpr auto codec<"UTF-8">::size([[maybe_unused]] char32_t code) noexcept -> int8_t
 {
 	const size_t N (std::bit_width
 	(static_cast<uint32_t>(code)));
@@ -1035,7 +1263,7 @@ constexpr auto codec<"UTF-8">::size(char32_t code) noexcept -> int8_t
 	return 1 + (8 <= N) + (12 <= N) + (17 <= N);
 }
 
-constexpr auto codec<"UTF-8">::next(const T* data) noexcept -> int8_t
+constexpr auto codec<"UTF-8">::next([[maybe_unused]] const T* data) noexcept -> int8_t
 {
 	constexpr static const int8_t TABLE[]
 	{
@@ -1054,7 +1282,7 @@ constexpr auto codec<"UTF-8">::next(const T* data) noexcept -> int8_t
 	return TABLE[(data[0] >> 0x4) & 0x0F];
 }
 
-constexpr auto codec<"UTF-8">::back(const T* data) noexcept -> int8_t
+constexpr auto codec<"UTF-8">::back([[maybe_unused]] const T* data) noexcept -> int8_t
 {
 	int8_t i {-1};
 	
@@ -1200,7 +1428,7 @@ constexpr auto codec<"UTF-8">::decode(const T* in, char32_t& out, int8_t size) n
 #pragma endregion codec<"UTF-8">
 #pragma region codec<"UTF-16">
 
-constexpr auto codec<"UTF-16">::size(char32_t code) noexcept -> int8_t
+constexpr auto codec<"UTF-16">::size([[maybe_unused]] char32_t code) noexcept -> int8_t
 {
 	//┌───────────────────────┐
 	//│ U+000000 ... U+00D7FF │ -> 1 code unit
@@ -1211,12 +1439,12 @@ constexpr auto codec<"UTF-16">::size(char32_t code) noexcept -> int8_t
 	return 1 + (0xFFFF /* pair? */ < code);
 }
 
-constexpr auto codec<"UTF-16">::next(const T* data) noexcept -> int8_t
+constexpr auto codec<"UTF-16">::next([[maybe_unused]] const T* data) noexcept -> int8_t
 {
 	return +1 + ((data[0] >> 0xA) == 0x36);
 }
 
-constexpr auto codec<"UTF-16">::back(const T* data) noexcept -> int8_t
+constexpr auto codec<"UTF-16">::back([[maybe_unused]] const T* data) noexcept -> int8_t
 {
 	int8_t i {-1};
 	
@@ -1297,17 +1525,17 @@ constexpr auto codec<"UTF-16">::decode(const T* in, char32_t& out, int8_t size) 
 #pragma endregion codec<"UTF-16">
 #pragma region codec<"UTF-32">
 
-constexpr auto codec<"UTF-32">::size(char32_t code) noexcept -> int8_t
+constexpr auto codec<"UTF-32">::size([[maybe_unused]] char32_t code) noexcept -> int8_t
 {
 	return 1;
 }
 
-constexpr auto codec<"UTF-32">::next(const T* data) noexcept -> int8_t
+constexpr auto codec<"UTF-32">::next([[maybe_unused]] const T* data) noexcept -> int8_t
 {
 	return +1;
 }
 
-constexpr auto codec<"UTF-32">::back(const T* data) noexcept -> int8_t
+constexpr auto codec<"UTF-32">::back([[maybe_unused]] const T* data) noexcept -> int8_t
 {
 	return -1;
 }
@@ -1353,417 +1581,379 @@ constexpr auto codec<"UTF-32">::decode(const T* in, char32_t& out, int8_t size) 
 #pragma endregion codec<"UTF-32">
 #pragma region CRTP
 
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::head() const noexcept -> const T*
+template <typename Class /* CRTP core */> constexpr auto API<Class>::head() const noexcept -> const T*
 {
-	if constexpr (requires { static_cast<const Super*>(this)->__head__(); })
-	     return static_cast<const Super*>(this)->__head__();
-	else return static_cast<const Super*>(this)->__head__  ;
+	if constexpr (requires { static_cast<const Class*>(this)->__head__(); })
+	     return static_cast<const Class*>(this)->__head__();
+	else return static_cast<const Class*>(this)->__head__  ;
 }
 
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::tail() const noexcept -> const T*
+template <typename Class /* CRTP core */> constexpr auto API<Class>::tail() const noexcept -> const T*
 {
-	if constexpr (requires { static_cast<const Super*>(this)->__tail__(); })
-	     return static_cast<const Super*>(this)->__tail__();
-	else return static_cast<const Super*>(this)->__tail__  ;
+	if constexpr (requires { static_cast<const Class*>(this)->__tail__(); })
+	     return static_cast<const Class*>(this)->__tail__();
+	else return static_cast<const Class*>(this)->__tail__  ;
 }
 
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::size() const noexcept -> size_t
+template <typename Class /* CRTP core */> constexpr auto API<Class>::size() const noexcept -> size_t
 {
 	return detail::__difcu__<Codec /*&*/>(this->head(), this->tail());
 }
 
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::length() const noexcept -> size_t
+template <typename Class /* CRTP core */> constexpr auto API<Class>::length() const noexcept -> size_t
 {
 	return detail::__difcp__<Codec /*&*/>(this->head(), this->tail());
 }
 
-template <typename Super, typename Codec>
-template <typename Other, typename Arena> constexpr auto API<Super, Codec>::starts_with(__OWNED__(value)) const noexcept -> bool
+template <typename Class /* CRTP core */>
+template <typename Other, typename Arena> constexpr auto API<Class>::starts_with(__OWNED__(value)) const noexcept -> bool
 {
 	return detail::__swith__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail());
 }
 
-template <typename Super, typename Codec>
-template <typename Other /* can't own */> constexpr auto API<Super, Codec>::starts_with(__SLICE__(value)) const noexcept -> bool
+template <typename Class /* CRTP core */>
+template <typename Other /* can't own */> constexpr auto API<Class>::starts_with(__SLICE__(value)) const noexcept -> bool
 {
 	return detail::__swith__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail());
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::starts_with(__EQSTR__(value)) const noexcept -> bool requires (std::is_same_v<T, char>)
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::starts_with(__EQSTR__(value)) const noexcept -> bool requires (std::is_same_v<T, char>)
 {
 	return detail::__swith__<Codec, Codec>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::starts_with(__08STR__(value)) const noexcept -> bool /* encoding of char8_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::starts_with(__08STR__(value)) const noexcept -> bool /* encoding of char8_t is trivial */
 {
 	return detail::__swith__<Codec, codec<"UTF-8">>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::starts_with(__16STR__(value)) const noexcept -> bool /* encoding of char16_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::starts_with(__16STR__(value)) const noexcept -> bool /* encoding of char16_t is trivial */
 {
 	return detail::__swith__<Codec, codec<"UTF-16">>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::starts_with(__32STR__(value)) const noexcept -> bool /* encoding of char32_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::starts_with(__32STR__(value)) const noexcept -> bool /* encoding of char32_t is trivial */
 {
 	return detail::__swith__<Codec, codec<"UTF-32">>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <typename Other, typename Arena> constexpr auto API<Super, Codec>::ends_with(__OWNED__(value)) const noexcept -> bool
+template <typename Class /* CRTP core */>
+template <typename Other, typename Arena> constexpr auto API<Class>::ends_with(__OWNED__(value)) const noexcept -> bool
 {
 	return detail::__ewith__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail());
 }
 
-template <typename Super, typename Codec>
-template <typename Other /* can't own */> constexpr auto API<Super, Codec>::ends_with(__SLICE__(value)) const noexcept -> bool
+template <typename Class /* CRTP core */>
+template <typename Other /* can't own */> constexpr auto API<Class>::ends_with(__SLICE__(value)) const noexcept -> bool
 {
 	return detail::__ewith__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail());
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::ends_with(__EQSTR__(value)) const noexcept -> bool requires (std::is_same_v<T, char>)
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::ends_with(__EQSTR__(value)) const noexcept -> bool requires (std::is_same_v<T, char>)
 {
 	return detail::__ewith__<Codec, Codec>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::ends_with(__08STR__(value)) const noexcept -> bool /* encoding of char8_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::ends_with(__08STR__(value)) const noexcept -> bool /* encoding of char8_t is trivial */
 {
 	return detail::__ewith__<Codec, codec<"UTF-8">>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::ends_with(__16STR__(value)) const noexcept -> bool /* encoding of char16_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::ends_with(__16STR__(value)) const noexcept -> bool /* encoding of char16_t is trivial */
 {
 	return detail::__ewith__<Codec, codec<"UTF-16">>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::ends_with(__32STR__(value)) const noexcept -> bool /* encoding of char32_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::ends_with(__32STR__(value)) const noexcept -> bool /* encoding of char32_t is trivial */
 {
 	return detail::__ewith__<Codec, codec<"UTF-32">>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <typename Other, typename Arena> constexpr auto API<Super, Codec>::contains(__OWNED__(value)) const noexcept -> size_t
+template <typename Class /* CRTP core */>
+template <typename Other, typename Arena> constexpr auto API<Class>::contains(__OWNED__(value)) const noexcept -> size_t
 {
 	return detail::__match__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail()).size();
 }
 
-template <typename Super, typename Codec>
-template <typename Other /* can't own */> constexpr auto API<Super, Codec>::contains(__SLICE__(value)) const noexcept -> size_t
+template <typename Class /* CRTP core */>
+template <typename Other /* can't own */> constexpr auto API<Class>::contains(__SLICE__(value)) const noexcept -> size_t
 {
 	return detail::__match__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail()).size();
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::contains(__EQSTR__(value)) const noexcept -> size_t requires (std::is_same_v<T, char>)
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::contains(__EQSTR__(value)) const noexcept -> size_t requires (std::is_same_v<T, char>)
 {
 	return detail::__match__<Codec, Codec>(this->head(), this->tail(), &value[N - N], &value[N - 1]).size();
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::contains(__08STR__(value)) const noexcept -> size_t /* encoding of char8_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::contains(__08STR__(value)) const noexcept -> size_t /* encoding of char8_t is trivial */
 {
 	return detail::__match__<Codec, codec<"UTF-8">>(this->head(), this->tail(), &value[N - N], &value[N - 1]).size();
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::contains(__16STR__(value)) const noexcept -> size_t /* encoding of char16_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::contains(__16STR__(value)) const noexcept -> size_t /* encoding of char16_t is trivial */
 {
 	return detail::__match__<Codec, codec<"UTF-16">>(this->head(), this->tail(), &value[N - N], &value[N - 1]).size();
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::contains(__32STR__(value)) const noexcept -> size_t /* encoding of char32_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::contains(__32STR__(value)) const noexcept -> size_t /* encoding of char32_t is trivial */
 {
 	return detail::__match__<Codec, codec<"UTF-32">>(this->head(), this->tail(), &value[N - N], &value[N - 1]).size();
 }
 
-template <typename Super, typename Codec>
-template <typename Other, typename Arena> constexpr auto API<Super, Codec>::split(__OWNED__(value)) const noexcept -> std::vector<txt<Codec>>
+template <typename Class /* CRTP core */>
+template <typename Other, typename Arena> constexpr auto API<Class>::split(__OWNED__(value)) const noexcept -> std::vector<txt<Codec>>
 {
 	return detail::__split__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail());
 }
 
-template <typename Super, typename Codec>
-template <typename Other /* can't own */> constexpr auto API<Super, Codec>::split(__SLICE__(value)) const noexcept -> std::vector<txt<Codec>>
+template <typename Class /* CRTP core */>
+template <typename Other /* can't own */> constexpr auto API<Class>::split(__SLICE__(value)) const noexcept -> std::vector<txt<Codec>>
 {
 	return detail::__split__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail());
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::split(__EQSTR__(value)) const noexcept -> std::vector<txt<Codec>> requires (std::is_same_v<T, char>)
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::split(__EQSTR__(value)) const noexcept -> std::vector<txt<Codec>> requires (std::is_same_v<T, char>)
 {
 	return detail::__split__<Codec, Codec>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::split(__08STR__(value)) const noexcept -> std::vector<txt<Codec>> /* encoding of char8_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::split(__08STR__(value)) const noexcept -> std::vector<txt<Codec>> /* encoding of char8_t is trivial */
 {
 	return detail::__split__<Codec, codec<"UTF-8">>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::split(__16STR__(value)) const noexcept -> std::vector<txt<Codec>> /* encoding of char16_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::split(__16STR__(value)) const noexcept -> std::vector<txt<Codec>> /* encoding of char16_t is trivial */
 {
 	return detail::__split__<Codec, codec<"UTF-16">>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::split(__32STR__(value)) const noexcept -> std::vector<txt<Codec>> /* encoding of char32_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::split(__32STR__(value)) const noexcept -> std::vector<txt<Codec>> /* encoding of char32_t is trivial */
 {
 	return detail::__split__<Codec, codec<"UTF-32">>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <typename Other, typename Arena> constexpr auto API<Super, Codec>::match(__OWNED__(value)) const noexcept -> std::vector<txt<Codec>>
+template <typename Class /* CRTP core */>
+template <typename Other, typename Arena> constexpr auto API<Class>::match(__OWNED__(value)) const noexcept -> std::vector<txt<Codec>>
 {
 	return detail::__match__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail());
 }
 
-template <typename Super, typename Codec>
-template <typename Other /* can't own */> constexpr auto API<Super, Codec>::match(__SLICE__(value)) const noexcept -> std::vector<txt<Codec>>
+template <typename Class /* CRTP core */>
+template <typename Other /* can't own */> constexpr auto API<Class>::match(__SLICE__(value)) const noexcept -> std::vector<txt<Codec>>
 {
 	return detail::__match__<Codec, Other>(this->head(), this->tail(), value.head(), value.tail());
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::match(__EQSTR__(value)) const noexcept -> std::vector<txt<Codec>> requires (std::is_same_v<T, char>)
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::match(__EQSTR__(value)) const noexcept -> std::vector<txt<Codec>> requires (std::is_same_v<T, char>)
 {
 	return detail::__match__<Codec, Codec>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::match(__08STR__(value)) const noexcept -> std::vector<txt<Codec>> /* encoding of char8_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::match(__08STR__(value)) const noexcept -> std::vector<txt<Codec>> /* encoding of char8_t is trivial */
 {
 	return detail::__match__<Codec, codec<"UTF-8">>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::match(__16STR__(value)) const noexcept -> std::vector<txt<Codec>> /* encoding of char16_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::match(__16STR__(value)) const noexcept -> std::vector<txt<Codec>> /* encoding of char16_t is trivial */
 {
 	return detail::__match__<Codec, codec<"UTF-16">>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::match(__32STR__(value)) const noexcept -> std::vector<txt<Codec>> /* encoding of char32_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::match(__32STR__(value)) const noexcept -> std::vector<txt<Codec>> /* encoding of char32_t is trivial */
 {
 	return detail::__match__<Codec, codec<"UTF-32">>(this->head(), this->tail(), &value[N - N], &value[N - 1]);
 }
 
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::substr(clamp  start, clamp  until) const noexcept -> txt<Codec>
+template <typename Class /* CRTP core */> constexpr auto API<Class>::substr(clamp  start, clamp  until) const noexcept -> txt<Codec>
 {
 	return detail::__substr__<Codec /*&*/>(this->head(), this->tail(), start, until);
 }
 
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::substr(clamp  start, range  until) const noexcept -> txt<Codec>
+template <typename Class /* CRTP core */> constexpr auto API<Class>::substr(clamp  start, range  until) const noexcept -> txt<Codec>
 {
 	return detail::__substr__<Codec /*&*/>(this->head(), this->tail(), start, until);
 }
 
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::substr(size_t start, clamp  until) const noexcept -> txt<Codec>
+template <typename Class /* CRTP core */> constexpr auto API<Class>::substr(size_t start, clamp  until) const noexcept -> txt<Codec>
 {
 	return detail::__substr__<Codec /*&*/>(this->head(), this->tail(), start, until);
 }
 
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::substr(size_t start, range  until) const noexcept -> txt<Codec>
+template <typename Class /* CRTP core */> constexpr auto API<Class>::substr(size_t start, range  until) const noexcept -> txt<Codec>
 {
 	return detail::__substr__<Codec /*&*/>(this->head(), this->tail(), start, until);
 }
 
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::substr(size_t start, size_t until) const noexcept -> txt<Codec>
+template <typename Class /* CRTP core */> constexpr auto API<Class>::substr(size_t start, size_t until) const noexcept -> txt<Codec>
 {
 	return detail::__substr__<Codec /*&*/>(this->head(), this->tail(), start, until);
 }
 
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::begin() const noexcept -> cursor
+template <typename Class /* CRTP core */> constexpr auto API<Class>::begin() const noexcept -> const_forward_iterator
 {
 	return {this->head()};
 }
 
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::end() const noexcept -> cursor
+template <typename Class /* CRTP core */> constexpr auto API<Class>::end() const noexcept -> const_forward_iterator
 {
 	return {this->tail()};
 }
 
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::operator[](size_t value) const noexcept -> decltype(auto)
+template <typename Class /* CRTP core */> constexpr auto API<Class>::rbegin() const noexcept -> const_reverse_iterator
 {
-	return typename Super::reader {static_cast<Super*>(this), value};
+	return {this->tail()};
 }
 
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::operator[](size_t value) /*&*/ noexcept -> decltype(auto)
+template <typename Class /* CRTP core */> constexpr auto API<Class>::rend() const noexcept -> const_reverse_iterator
 {
-	return typename Super::writer {static_cast<Super*>(this), value};
+	return {this->head()};
 }
 
-template <typename Super, typename Codec>
-template <typename Other, typename Arena> constexpr auto API<Super, Codec>::operator==(__OWNED__(rhs)) const noexcept -> bool
+template <typename Class /* CRTP core */> constexpr auto API<Class>::operator[](size_t value) const noexcept -> decltype(auto)
+{
+	return typename Class::reader {static_cast<Class*>(this), value};
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::operator[](size_t value) /*&*/ noexcept -> decltype(auto)
+{
+	return typename Class::writer {static_cast<Class*>(this), value};
+}
+
+template <typename Class /* CRTP core */>
+template <typename Other, typename Arena> constexpr auto API<Class>::operator==(__OWNED__(rhs)) const noexcept -> bool
 {
 	return detail::__equal__<Codec, Other>(this->head(), this->tail(), rhs.head(), rhs.tail());
 }
 
-template <typename Super, typename Codec>
-template <typename Other /* can't own */> constexpr auto API<Super, Codec>::operator==(__SLICE__(rhs)) const noexcept -> bool
+template <typename Class /* CRTP core */>
+template <typename Other /* can't own */> constexpr auto API<Class>::operator==(__SLICE__(rhs)) const noexcept -> bool
 {
 	return detail::__equal__<Codec, Other>(this->head(), this->tail(), rhs.head(), rhs.tail());
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::operator==(__EQSTR__(rhs)) const noexcept -> bool requires (std::is_same_v<T, char>)
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::operator==(__EQSTR__(rhs)) const noexcept -> bool requires (std::is_same_v<T, char>)
 {
 	return detail::__equal__<Codec, Codec>(this->head(), this->tail(), &rhs[N - N], &rhs[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::operator==(__08STR__(rhs)) const noexcept -> bool /* encoding of char8_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::operator==(__08STR__(rhs)) const noexcept -> bool /* encoding of char8_t is trivial */
 {
 	return detail::__equal__<Codec, codec<"UTF-8">>(this->head(), this->tail(), &rhs[N - N], &rhs[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::operator==(__16STR__(rhs)) const noexcept -> bool /* encoding of char16_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::operator==(__16STR__(rhs)) const noexcept -> bool /* encoding of char16_t is trivial */
 {
 	return detail::__equal__<Codec, codec<"UTF-16">>(this->head(), this->tail(), &rhs[N - N], &rhs[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::operator==(__32STR__(rhs)) const noexcept -> bool /* encoding of char32_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::operator==(__32STR__(rhs)) const noexcept -> bool /* encoding of char32_t is trivial */
 {
 	return detail::__equal__<Codec, codec<"UTF-32">>(this->head(), this->tail(), &rhs[N - N], &rhs[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <typename Other, typename Arena> constexpr auto API<Super, Codec>::operator!=(__OWNED__(rhs)) const noexcept -> bool
+template <typename Class /* CRTP core */>
+template <typename Other, typename Arena> constexpr auto API<Class>::operator!=(__OWNED__(rhs)) const noexcept -> bool
 {
 	return detail::__nqual__<Codec, Other>(this->head(), this->tail(), rhs.head(), rhs.tail());
 }
 
-template <typename Super, typename Codec>
-template <typename Other /* can't own */> constexpr auto API<Super, Codec>::operator!=(__SLICE__(rhs)) const noexcept -> bool
+template <typename Class /* CRTP core */>
+template <typename Other /* can't own */> constexpr auto API<Class>::operator!=(__SLICE__(rhs)) const noexcept -> bool
 {
 	return detail::__nqual__<Codec, Other>(this->head(), this->tail(), rhs.head(), rhs.tail());
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::operator!=(__EQSTR__(rhs)) const noexcept -> bool requires (std::is_same_v<T, char>)
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::operator!=(__EQSTR__(rhs)) const noexcept -> bool requires (std::is_same_v<T, char>)
 {
 	return detail::__nqual__<Codec, Codec>(this->head(), this->tail(), &rhs[N - N], &rhs[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::operator!=(__08STR__(rhs)) const noexcept -> bool /* encoding of char8_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::operator!=(__08STR__(rhs)) const noexcept -> bool /* encoding of char8_t is trivial */
 {
 	return detail::__nqual__<Codec, codec<"UTF-8">>(this->head(), this->tail(), &rhs[N - N], &rhs[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::operator!=(__16STR__(rhs)) const noexcept -> bool /* encoding of char16_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::operator!=(__16STR__(rhs)) const noexcept -> bool /* encoding of char16_t is trivial */
 {
 	return detail::__nqual__<Codec, codec<"UTF-16">>(this->head(), this->tail(), &rhs[N - N], &rhs[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::operator!=(__32STR__(rhs)) const noexcept -> bool /* encoding of char32_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::operator!=(__32STR__(rhs)) const noexcept -> bool /* encoding of char32_t is trivial */
 {
 	return detail::__nqual__<Codec, codec<"UTF-32">>(this->head(), this->tail(), &rhs[N - N], &rhs[N - 1]);
 }
 
-template <typename Super, typename Codec>
-template <typename Other, typename Arena> constexpr auto API<Super, Codec>::operator+(__OWNED__(rhs)) const noexcept -> concat<txt<Codec>, txt<Other>>
+template <typename Class /* CRTP core */>
+template <typename Other, typename Arena> constexpr auto API<Class>::operator+(__OWNED__(rhs)) const noexcept -> concat<txt<Codec>, txt<Other>>
 {
 	return {{this->head(), this->tail()}, {rhs.head(), rhs.tail()}};
 }
 
-template <typename Super, typename Codec>
-template <typename Other /* can't own */> constexpr auto API<Super, Codec>::operator+(__SLICE__(rhs)) const noexcept -> concat<txt<Codec>, txt<Other>>
+template <typename Class /* CRTP core */>
+template <typename Other /* can't own */> constexpr auto API<Class>::operator+(__SLICE__(rhs)) const noexcept -> concat<txt<Codec>, txt<Other>>
 {
 	return {{this->head(), this->tail()}, {rhs.head(), rhs.tail()}};
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::operator+(__EQSTR__(rhs)) const noexcept -> concat<txt<Codec>, txt<Codec>> requires (std::is_same_v<T, char>)
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::operator+(__EQSTR__(rhs)) const noexcept -> concat<txt<Codec>, txt<Codec>> requires (std::is_same_v<T, char>)
 {
 	return {{this->head(), this->tail()}, {&rhs[N - N], &rhs[N - 1]}};
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::operator+(__08STR__(rhs)) const noexcept -> concat<txt<Codec>, txt<codec<"UTF-8">>> /* encoding of char8_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::operator+(__08STR__(rhs)) const noexcept -> concat<txt<Codec>, txt<codec<"UTF-8">>> /* encoding of char8_t is trivial */
 {
 	return {{this->head(), this->tail()}, {&rhs[N - N], &rhs[N - 1]}};
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::operator+(__16STR__(rhs)) const noexcept -> concat<txt<Codec>, txt<codec<"UTF-16">>> /* encoding of char16_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::operator+(__16STR__(rhs)) const noexcept -> concat<txt<Codec>, txt<codec<"UTF-16">>> /* encoding of char16_t is trivial */
 {
 	return {{this->head(), this->tail()}, {&rhs[N - N], &rhs[N - 1]}};
 }
 
-template <typename Super, typename Codec>
-template <size_t                       N> constexpr auto API<Super, Codec>::operator+(__32STR__(rhs)) const noexcept -> concat<txt<Codec>, txt<codec<"UTF-32">>> /* encoding of char32_t is trivial */
+template <typename Class /* CRTP core */>
+template <size_t                       N> constexpr auto API<Class>::operator+(__32STR__(rhs)) const noexcept -> concat<txt<Codec>, txt<codec<"UTF-32">>> /* encoding of char32_t is trivial */
 {
 	return {{this->head(), this->tail()}, {&rhs[N - N], &rhs[N - 1]}};
 }
 
 #pragma endregion CRTP
-#pragma region CRTP::cursor
-
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::cursor::operator*() const noexcept -> char32_t
-{
-	char32_t T_out;
-
-	const auto T_size {Codec::next(this->ptr)};
-	Codec::decode(this->ptr, T_out, T_size);
-
-	return T_out;
-}
-
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::cursor::operator&() const noexcept -> const T*
-{
-	return this->ptr;
-}
-
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::cursor::operator++(   ) noexcept -> cursor&
-{
-	this->ptr += Codec::next(this->ptr); return *this;
-}
-
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::cursor::operator++(int) noexcept -> cursor
-{
-	const auto clone {*this}; operator++(); return clone;
-}
-
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::cursor::operator--(   ) noexcept -> cursor&
-{
-	this->ptr += Codec::back(this->ptr); return *this;
-}
-
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::cursor::operator--(int) noexcept -> cursor
-{
-	const auto clone {*this}; operator--(); return clone;
-}
-
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::cursor::operator==(const cursor& rhs) const noexcept -> bool
-{
-	return this->ptr == rhs.ptr;
-}
-
-template <typename Super, typename Codec> constexpr auto API<Super, Codec>::cursor::operator!=(const cursor& rhs) const noexcept -> bool
-{
-	return this->ptr != rhs.ptr;
-}
-
-#pragma endregion CRTP::cursor
 #pragma region CRTP::concat
 
-template <typename Super, typename Codec>
+template <typename Class /* CRTP core */>
 template <typename   LHS, typename   RHS>
-template <typename Other, typename Arena> constexpr API<Super, Codec>::concat<LHS, RHS>::operator str<Other, Arena>() const noexcept
+template <typename Other, typename Arena> constexpr API<Class>::concat<LHS, RHS>::operator str<Other, Arena>() const noexcept
 {
 	typedef typename Codec::T T;
 	typedef typename Other::T U;
@@ -1772,23 +1962,18 @@ template <typename Other, typename Arena> constexpr API<Super, Codec>::concat<LH
 
 	this->__for_each__([&](auto&& chunk)
 	{
-		typedef decltype(chunk) Ty;
-
-		if constexpr (!std::is_same_v<Ty, none_t>)
+		[&]<typename 𝒞𝑜𝒹𝑒𝒸>(const txt<𝒞𝑜𝒹𝑒𝒸>& slice)
 		{
-			[&]<typename Impl>(const txt<Impl>& slice)
+			if constexpr (std::is_same_v<Other, 𝒞𝑜𝒹𝑒𝒸>)
 			{
-				if constexpr (std::is_same_v<Other, Impl>)
-				{
-					size += detail::__difcu__<Other>(slice.head(), slice.tail());
-				}
-				if constexpr (!std::is_same_v<Other, Impl>)
-				{
-					for (const auto code : slice) { size += Other::size(code); }
-				}
+				size += detail::__difcu__<Other>(slice.head(), slice.tail());
 			}
-			(chunk);
+			if constexpr (!std::is_same_v<Other, 𝒞𝑜𝒹𝑒𝒸>)
+			{
+				for (const auto code : slice) { size += Other::size(code); }
+			}
 		}
+		(chunk);
 	});
 
 	str<Other, Arena> out;
@@ -1800,30 +1985,25 @@ template <typename Other, typename Arena> constexpr API<Super, Codec>::concat<LH
 
 	this->__for_each__([&](auto&& chunk)
 	{
-		typedef decltype(chunk) Ty;
-
-		if constexpr (!std::is_same_v<Ty, none_t>)
+		[&]<typename 𝒞𝑜𝒹𝑒𝒸>(const txt<𝒞𝑜𝒹𝑒𝒸>& slice)
 		{
-			[&]<typename Impl>(const txt<Impl>& slice)
+			if constexpr (std::is_same_v<Other, 𝒞𝑜𝒹𝑒𝒸>)
 			{
-				if constexpr (std::is_same_v<Other, Impl>)
-				{
-					ptr += detail::__fcopy__<Other, Impl>(slice.head(), slice.tail(), ptr);
-				}
-				if constexpr (!std::is_same_v<Other, Impl>)
-				{
-					ptr += detail::__fcopy__<Other, Impl>(slice.head(), slice.tail(), ptr);
-				}
+				ptr += detail::__fcopy__<Other, 𝒞𝑜𝒹𝑒𝒸>(slice.head(), slice.tail(), ptr);
 			}
-			(chunk);
+			if constexpr (!std::is_same_v<Other, 𝒞𝑜𝒹𝑒𝒸>)
+			{
+				ptr += detail::__fcopy__<Other, 𝒞𝑜𝒹𝑒𝒸>(slice.head(), slice.tail(), ptr);
+			}
 		}
+		(chunk);
 	});
 
 	return out;
 }
 
-template <typename Super, typename Codec>
-template <typename   LHS, typename   RHS> constexpr auto API<Super, Codec>::concat<LHS, RHS>::__for_each__(const auto&& fun) const noexcept -> void
+template <typename Class /* CRTP core */>
+template <typename   LHS, typename   RHS> constexpr auto API<Class>::concat<LHS, RHS>::__for_each__(const auto&& fun) const noexcept -> void
 {
 	if constexpr (requires(LHS l) { l.__for_each__(fun); })
 	{ this->lhs.__for_each__(fun); } else { fun(this->lhs); }
@@ -1832,94 +2012,252 @@ template <typename   LHS, typename   RHS> constexpr auto API<Super, Codec>::conc
 	{ this->rhs.__for_each__(fun); } else { fun(this->rhs); }
 }
 
-template <typename Super, typename Codec>
+template <typename Class /* CRTP core */>
 template <typename   LHS, typename   RHS>
-template <typename Other, typename Arena> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator=(__OWNED__(rhs)) noexcept -> concat<none_t, txt<Other>>
+template <typename Other, typename Arena> constexpr auto API<Class>::concat<LHS, RHS>::operator=(__OWNED__(rhs)) noexcept -> concat<blank_t, txt<Other>>
 {
-	return {69'74, {rhs}};
+	return {{""}, {rhs}};
 }
 
-template <typename Super, typename Codec>
+template <typename Class /* CRTP core */>
 template <typename   LHS, typename   RHS>
-template <typename Other /* can't own */> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator=(__SLICE__(rhs)) noexcept -> concat<none_t, decltype(rhs)>
+template <typename Other /* can't own */> constexpr auto API<Class>::concat<LHS, RHS>::operator=(__SLICE__(rhs)) noexcept -> concat<blank_t, txt<Other>>
 {
-	return {69'74, {rhs}};
+	return {{""}, {rhs}};
 }
 
-template <typename Super, typename Codec>
+template <typename Class /* CRTP core */>
 template <typename   LHS, typename   RHS>
-template <size_t                       N> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator=(__08STR__(rhs)) noexcept -> concat<none_t, txt<codec<"UTF-8">>>
+template <size_t                       N> constexpr auto API<Class>::concat<LHS, RHS>::operator=(__08STR__(rhs)) noexcept -> concat<blank_t, txt<codec<"UTF-8">>>
 {
-	return {69'74, {rhs}};
+	return {{""}, {rhs}};
 }
 
-template <typename Super, typename Codec>
+template <typename Class /* CRTP core */>
 template <typename   LHS, typename   RHS>
-template <size_t                       N> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator=(__16STR__(rhs)) noexcept -> concat<none_t, txt<codec<"UTF-16">>>
+template <size_t                       N> constexpr auto API<Class>::concat<LHS, RHS>::operator=(__16STR__(rhs)) noexcept -> concat<blank_t, txt<codec<"UTF-16">>>
 {
-	return {69'74, {rhs}};
+	return {{""}, {rhs}};
 }
 
-template <typename Super, typename Codec>
+template <typename Class /* CRTP core */>
 template <typename   LHS, typename   RHS>
-template <size_t                       N> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator=(__32STR__(rhs)) noexcept -> concat<none_t, txt<codec<"UTF-32">>>
+template <size_t                       N> constexpr auto API<Class>::concat<LHS, RHS>::operator=(__32STR__(rhs)) noexcept -> concat<blank_t, txt<codec<"UTF-32">>>
 {
-	return {69'74, {rhs}};
+	return {{""}, {rhs}};
 }
 
-template <typename Super, typename Codec>
+template <typename Class /* CRTP core */>
 template <typename   LHS, typename   RHS>
-template <typename Other, typename Arena> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator=(const str<Other, Arena>&& rhs) noexcept -> concat<none_t, str<Other, Arena>>
-{
-	return {69'74, {rhs}};
-}
-
-template <typename Super, typename Codec>
-template <typename   LHS, typename   RHS>
-template <typename Other, typename Arena> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator+(__OWNED__(rhs)) noexcept -> concat<concat, txt<Other>>
+template <typename Other, typename Arena> constexpr auto API<Class>::concat<LHS, RHS>::operator+(__OWNED__(rhs)) noexcept -> concat<concat, txt<Other>>
 {
 	return {*this, {rhs}};
 }
 
-template <typename Super, typename Codec>
+template <typename Class /* CRTP core */>
 template <typename   LHS, typename   RHS>
-template <typename Other /* can't own */> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator+(__SLICE__(rhs)) noexcept -> concat<concat, decltype(rhs)>
+template <typename Other /* can't own */> constexpr auto API<Class>::concat<LHS, RHS>::operator+(__SLICE__(rhs)) noexcept -> concat<concat, txt<Other>>
 {
 	return {*this, {rhs}};
 }
 
-template <typename Super, typename Codec>
+template <typename Class /* CRTP core */>
 template <typename   LHS, typename   RHS>
-template <size_t                       N> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator+(__08STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-8">>>
+template <size_t                       N> constexpr auto API<Class>::concat<LHS, RHS>::operator+(__08STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-8">>>
 {
 	return {*this, {rhs}};
 }
 
-template <typename Super, typename Codec>
+template <typename Class /* CRTP core */>
 template <typename   LHS, typename   RHS>
-template <size_t                       N> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator+(__16STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-16">>>
+template <size_t                       N> constexpr auto API<Class>::concat<LHS, RHS>::operator+(__16STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-16">>>
 {
 	return {*this, {rhs}};
 }
 
-template <typename Super, typename Codec>
+template <typename Class /* CRTP core */>
 template <typename   LHS, typename   RHS>
-template <size_t                       N> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator+(__32STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-32">>>
-{
-	return {*this, {rhs}};
-}
-
-template <typename Super, typename Codec>
-template <typename   LHS, typename   RHS>
-template <typename Other, typename Arena> constexpr auto API<Super, Codec>::concat<LHS, RHS>::operator+(const str<Other, Arena>&& rhs) noexcept -> concat<concat, str<Other, Arena>>
+template <size_t                       N> constexpr auto API<Class>::concat<LHS, RHS>::operator+(__32STR__(rhs)) noexcept -> concat<concat, txt<codec<"UTF-32">>>
 {
 	return {*this, {rhs}};
 }
 
 #pragma endregion CRTP::concat
+#pragma region CRTP::const_ltr_it
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator*() const noexcept -> value_type
+{
+	char32_t code;
+
+	Codec::decode(this->ptr, code, Codec::next(this->ptr));
+
+	return code;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator++(   ) noexcept -> decltype(*this)&
+{
+	this->ptr += Codec::next(this->ptr); return *this;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator++(int) noexcept -> decltype(*this)
+{
+	const auto clone {*this}; operator++(); return clone;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator--(   ) noexcept -> decltype(*this)&
+{
+	this->ptr += Codec::back(this->ptr); return *this;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator--(int) noexcept -> decltype(*this)
+{
+	const auto clone {*this}; operator--(); return clone;
+}
+
+#pragma endregion CRTP::const_ltr_it
+#pragma region CRTP::ltr_it
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::operator*() const noexcept -> value_type
+{
+	return {this->ptr};
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::operator++(   ) noexcept -> decltype(*this)&
+{
+	this->ptr += Codec::next(this->ptr); return *this;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::operator++(int) noexcept -> decltype(*this)
+{
+	const auto clone {*this}; operator++(); return clone;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::operator--(   ) noexcept -> decltype(*this)&
+{
+	this->ptr += Codec::back(this->ptr); return *this;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::operator--(int) noexcept -> decltype(*this)
+{
+	const auto clone {*this}; operator--(); return clone;
+}
+
+template <typename Class /* CRTP core */> [[nodiscard]] constexpr API<Class>::forward_iterator::unicode::operator char32_t() const noexcept
+{
+	char32_t code;
+
+	Codec::decode(this->ptr, code, Codec::next(this->ptr));
+
+	return code;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::unicode::operator=(char32_t code) noexcept -> unicode&
+{
+	Codec::encode(code, this->ptr, Codec::next(this->ptr));
+
+	return *this;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::unicode::operator==(char32_t code) const noexcept -> bool
+{
+	return this->operator char32_t() == code;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::unicode::operator!=(char32_t code) const noexcept -> bool
+{
+	return this->operator char32_t() != code;
+}
+
+#pragma endregion CRTP::ltr_it
+#pragma region CRTP::const_rtl_it
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator*() const noexcept -> value_type
+{
+	char32_t code;
+
+	Codec::decode(this->ptr, code, Codec::back(this->ptr));
+
+	return code;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator++(   ) noexcept -> decltype(*this)&
+{
+	this->ptr += Codec::back(this->ptr); return *this;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator++(int) noexcept -> decltype(*this)
+{
+	const auto clone {*this}; operator++(); return clone;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator--(   ) noexcept -> decltype(*this)&
+{
+	this->ptr += Codec::next(this->ptr); return *this;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator--(int) noexcept -> decltype(*this)
+{
+	const auto clone {*this}; operator--(); return clone;
+}
+
+#pragma endregion CRTP::const_rtl_it
+#pragma region CRTP::rtl_it
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::operator*() const noexcept -> value_type
+{
+	return {this->ptr};
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::operator++(   ) noexcept -> decltype(*this)&
+{
+	this->ptr += Codec::back(this->ptr); return *this;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::operator++(int) noexcept -> decltype(*this)
+{
+	const auto clone {*this}; operator++(); return clone;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::operator--(   ) noexcept -> decltype(*this)&
+{
+	this->ptr += Codec::next(this->ptr); return *this;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::operator--(int) noexcept -> decltype(*this)
+{
+	const auto clone {*this}; operator--(); return clone;
+}
+
+template <typename Class /* CRTP core */> [[nodiscard]] constexpr API<Class>::reverse_iterator::unicode::operator char32_t() const noexcept
+{
+	char32_t code;
+
+	Codec::decode(this->ptr, code, Codec::back(this->ptr));
+
+	return code;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::unicode::operator=(char32_t code) noexcept -> unicode&
+{
+	Codec::encode(code, this->ptr, Codec::back(this->ptr));
+
+	return *this;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::unicode::operator==(char32_t code) const noexcept -> bool
+{
+	return this->operator char32_t() == code;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::unicode::operator!=(char32_t code) const noexcept -> bool
+{
+	return this->operator char32_t() != code;
+}
+
+#pragma endregion CRTP::rtl_it
 #pragma region CRTP::detail
 
-template <typename Codec /* can't own */> constexpr auto detail::__difcu__(const typename Codec::T* head, const typename Codec::T* tail) noexcept -> size_t
+template <typename Codec> constexpr auto detail::__difcu__(const typename Codec::T* head, const typename Codec::T* tail) noexcept -> size_t
 {
 	typedef typename Codec::T T;
 
@@ -1934,7 +2272,7 @@ template <typename Codec /* can't own */> constexpr auto detail::__difcu__(const
 	}
 }
 
-template <typename Codec /* can't own */> constexpr auto detail::__difcp__(const typename Codec::T* head, const typename Codec::T* tail) noexcept -> size_t
+template <typename Codec> constexpr auto detail::__difcp__(const typename Codec::T* head, const typename Codec::T* tail) noexcept -> size_t
 {
 	typedef typename Codec::T T;
 
@@ -1957,8 +2295,9 @@ template <typename Codec /* can't own */> constexpr auto detail::__difcp__(const
 	}
 }
 
-template <typename Codec, typename Other> constexpr auto detail::__fcopy__(const typename Other::T* head, const typename Other::T* tail,
-                                                                                                          /*&*/ typename Codec::T* dest) noexcept -> size_t
+template <typename Codec,
+          typename Other> constexpr auto detail::__fcopy__(const typename Other::T* head, const typename Other::T* tail,
+                                                                                          /*&*/ typename Codec::T* dest) noexcept -> size_t
 {
 	typedef typename Codec::T T;
 	typedef typename Other::T U;
@@ -2008,8 +2347,9 @@ template <typename Codec, typename Other> constexpr auto detail::__fcopy__(const
 	}
 }
 
-template <typename Codec, typename Other> constexpr auto detail::__rcopy__(const typename Other::T* head, const typename Other::T* tail,
-                                                                                                          /*&*/ typename Codec::T* dest) noexcept -> size_t
+template <typename Codec,
+          typename Other> constexpr auto detail::__rcopy__(const typename Other::T* head, const typename Other::T* tail,
+                                                                                          /*&*/ typename Codec::T* dest) noexcept -> size_t
 {
 	typedef typename Codec::T T;
 	typedef typename Other::T U;
@@ -2059,8 +2399,9 @@ template <typename Codec, typename Other> constexpr auto detail::__rcopy__(const
 	}
 }
 
-template <typename Codec, typename Other> constexpr auto detail::__equal__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
-                                                                           const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> bool
+template <typename Codec,
+          typename Other> constexpr auto detail::__equal__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
+                                                           const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> bool
 {
 	typedef typename Codec::T T;
 	typedef typename Other::T U;
@@ -2110,8 +2451,9 @@ template <typename Codec, typename Other> constexpr auto detail::__equal__(const
 	}
 }
 
-template <typename Codec, typename Other> constexpr auto detail::__nqual__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
-                                                                           const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> bool
+template <typename Codec,
+          typename Other> constexpr auto detail::__nqual__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
+                                                           const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> bool
 {
 	typedef typename Codec::T T;
 	typedef typename Other::T U;
@@ -2161,8 +2503,9 @@ template <typename Codec, typename Other> constexpr auto detail::__nqual__(const
 	}
 }
 
-template <typename Codec, typename Other> constexpr auto detail::__swith__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
-                                                                           const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> bool
+template <typename Codec,
+          typename Other> constexpr auto detail::__swith__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
+                                                           const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> bool
 {
 	typedef typename Codec::T T;
 	typedef typename Other::T U;
@@ -2213,8 +2556,9 @@ template <typename Codec, typename Other> constexpr auto detail::__swith__(const
 	}
 }
 
-template <typename Codec, typename Other> constexpr auto detail::__ewith__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
-                                                                           const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> bool
+template <typename Codec,
+          typename Other> constexpr auto detail::__ewith__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
+                                                           const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> bool
 {
 	typedef typename Codec::T T;
 	typedef typename Other::T U;
@@ -2265,9 +2609,10 @@ template <typename Codec, typename Other> constexpr auto detail::__ewith__(const
 	}
 }
 
-template <typename Codec, typename Other> constexpr auto detail::__scan__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
-                                                                          const typename Other::T* rhs_0, const typename Other::T* rhs_N,
-                                                                                                          const auto& fun /* lambda E */) noexcept -> void
+template <typename Codec,
+          typename Other> constexpr auto detail::__scan__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
+                                                          const typename Other::T* rhs_0, const typename Other::T* rhs_N,
+                                                                                          const auto& fun /* lambda E */) noexcept -> void
 {
 	typedef typename Codec::T T;
 	typedef typename Other::T U;
@@ -2457,8 +2802,9 @@ template <typename Codec, typename Other> constexpr auto detail::__scan__(const 
 	}
 }
 
-template <typename Codec, typename Other> constexpr auto detail::__split__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
-	                                                                       const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> std::vector<txt<Codec>>
+template <typename Codec,
+          typename Other> constexpr auto detail::__split__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
+	                                                       const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> std::vector<txt<Codec>>
 {
 	typedef typename Codec::T T;
 	typedef typename Other::T U;
@@ -2489,8 +2835,9 @@ template <typename Codec, typename Other> constexpr auto detail::__split__(const
 	return out;
 }
 
-template <typename Codec, typename Other> constexpr auto detail::__match__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
-	                                                                       const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> std::vector<txt<Codec>>
+template <typename Codec,
+          typename Other> constexpr auto detail::__match__(const typename Codec::T* lhs_0, const typename Codec::T* lhs_N,
+	                                                       const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> std::vector<txt<Codec>>
 {
 	typedef typename Codec::T T;
 	typedef typename Other::T U;
@@ -2514,7 +2861,7 @@ template <typename Codec, typename Other> constexpr auto detail::__match__(const
 	return out;
 }
 
-template <typename Codec /* can't own */> constexpr auto detail::__substr__(const typename Codec::T* head, const typename Codec::T* tail, clamp  start, clamp  until) noexcept -> txt<Codec>
+template <typename Codec> constexpr auto detail::__substr__(const typename Codec::T* head, const typename Codec::T* tail, clamp  start, clamp  until) noexcept -> txt<Codec>
 {
 	typedef typename Codec::T T;
 
@@ -2536,7 +2883,7 @@ template <typename Codec /* can't own */> constexpr auto detail::__substr__(cons
 	return {bar, foo};
 }
 
-template <typename Codec /* can't own */> constexpr auto detail::__substr__(const typename Codec::T* head, const typename Codec::T* tail, clamp  start, range  until) noexcept -> txt<Codec>
+template <typename Codec> constexpr auto detail::__substr__(const typename Codec::T* head, const typename Codec::T* tail, [[maybe_unused]] clamp  start, [[maybe_unused]] range  until) noexcept -> txt<Codec>
 {
 	typedef typename Codec::T T;
 
@@ -2554,7 +2901,7 @@ template <typename Codec /* can't own */> constexpr auto detail::__substr__(cons
 	return {foo, bar};
 }
 
-template <typename Codec /* can't own */> constexpr auto detail::__substr__(const typename Codec::T* head, const typename Codec::T* tail, size_t start, clamp  until) noexcept -> txt<Codec>
+template <typename Codec> constexpr auto detail::__substr__(const typename Codec::T* head, const typename Codec::T* tail, [[maybe_unused]] size_t start, [[maybe_unused]] clamp  until) noexcept -> txt<Codec>
 {
 	typedef typename Codec::T T;
 
@@ -2574,7 +2921,7 @@ template <typename Codec /* can't own */> constexpr auto detail::__substr__(cons
 	return {foo, bar};
 }
 
-template <typename Codec /* can't own */> constexpr auto detail::__substr__(const typename Codec::T* head, const typename Codec::T* tail, size_t start, range  until) noexcept -> txt<Codec>
+template <typename Codec> constexpr auto detail::__substr__(const typename Codec::T* head, const typename Codec::T* tail, [[maybe_unused]] size_t start, [[maybe_unused]] range  until) noexcept -> txt<Codec>
 {
 	typedef typename Codec::T T;
 
@@ -2592,7 +2939,7 @@ template <typename Codec /* can't own */> constexpr auto detail::__substr__(cons
 	return {foo, bar};
 }
 
-template <typename Codec /* can't own */> constexpr auto detail::__substr__(const typename Codec::T* head, const typename Codec::T* tail, size_t start, size_t until) noexcept -> txt<Codec>
+template <typename Codec> constexpr auto detail::__substr__(const typename Codec::T* head, const typename Codec::T* tail, [[maybe_unused]] size_t start, [[maybe_unused]] size_t until) noexcept -> txt<Codec>
 {
 	typedef typename Codec::T T;
 
@@ -2630,7 +2977,7 @@ template <typename Codec, typename Alloc> constexpr str<Codec, Alloc>::buffer::o
 template <typename Codec, typename Alloc> constexpr str<Codec, Alloc>::storage::storage() noexcept
 {
 	this->__union__.bytes[RMB] = MAX << SFT;
-	std::construct_at(this->__union__.small);
+	// std::construct_at(&this->__union__.large);
 }
 
 template <typename Codec, typename Alloc> constexpr str<Codec, Alloc>::storage::~storage() noexcept
@@ -2783,9 +3130,9 @@ template <typename Codec, typename Alloc> constexpr str<Codec, Alloc>::operator 
 	return this->__head__();
 }
 
-// copy constructor
 template <typename Codec, typename Alloc> constexpr str<Codec, Alloc>::str(const str& other) noexcept
 {
+	// copy constructor
 	if (this != &other)
 	{
 		this->capacity(other.size());
@@ -2801,9 +3148,9 @@ template <typename Codec, typename Alloc> constexpr str<Codec, Alloc>::str(const
 	}
 }
 
-// move constructor
 template <typename Codec, typename Alloc> constexpr str<Codec, Alloc>::str(/*&*/ str&& other) noexcept
 {
+	// move constructor
 	if (this != &other)
 	{
 		std::swap
@@ -2814,9 +3161,9 @@ template <typename Codec, typename Alloc> constexpr str<Codec, Alloc>::str(/*&*/
 	}
 }
 
-// copy assignment
 template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::operator=(const str& other) noexcept -> str&
 {
+	// copy assignment
 	if (this != &other)
 	{
 		this->capacity(other.size());
@@ -2833,9 +3180,9 @@ template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::oper
 	return *this;
 }
 
-// move assignment
 template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::operator=(/*&*/ str&& other) noexcept -> str&
 {
+	// move assignment
 	if (this != &other)
 	{
 		std::swap
@@ -2881,6 +3228,26 @@ template <typename Codec, typename Alloc>
 template <size_t                       N> constexpr str<Codec, Alloc>::str(__32STR__(str)) noexcept /* encoding of char32_t is trivial */
 {
 	this->operator=(str);
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::begin() /*&*/ noexcept -> typename str::forward_iterator_t
+{
+	return {this->__head__()};
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::end() /*&*/ noexcept -> typename str::forward_iterator_t
+{
+	return {this->__tail__()};
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::rbegin() /*&*/ noexcept -> typename str::reverse_iterator_t
+{
+	return {this->__tail__()};
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::rend() /*&*/ noexcept -> typename str::reverse_iterator_t
+{
+	return {this->__head__()};
 }
 
 template <typename Codec, typename Alloc>
@@ -3566,13 +3933,13 @@ auto fileof(const STRING& path) noexcept -> std::optional<std::variant
 #undef __16STR__
 #undef __32STR__
 
-typedef str<codec<"UTF-8">> utf8;
-typedef str<codec<"UTF-16">> utf16;
-typedef str<codec<"UTF-32">> utf32;
+using utf8 = str<codec<"UTF-8">>;
+using utf16 = str<codec<"UTF-16">>;
+using utf32 = str<codec<"UTF-32">>;
 
-typedef txt<codec<"UTF-8">> txt8;
-typedef txt<codec<"UTF-16">> txt16;
-typedef txt<codec<"UTF-32">> txt32;
+using txt8 = txt<codec<"UTF-8">>;
+using txt16 = txt<codec<"UTF-16">>;
+using txt32 = txt<codec<"UTF-32">>;
 
 #undef COPY_ASSIGNMENT
 #undef MOVE_ASSIGNMENT
@@ -3587,7 +3954,6 @@ template <size_t N> str(const char32_t (&_)[N]) -> str<codec<"UTF-32">>;
 template <size_t N> txt(const char8_t (&_)[N]) -> txt<codec<"UTF-8">>;
 template <size_t N> txt(const char16_t (&_)[N]) -> txt<codec<"UTF-16">>;
 template <size_t N> txt(const char32_t (&_)[N]) -> txt<codec<"UTF-32">>;
-
 }
 
 namespace std
@@ -3622,5 +3988,3 @@ template <typename Codec /* can't own */> struct hash<utf::txt<Codec /*##*/>>
 };
 
 }
-
-// NOLINTEND(*-avoid-c-arrays, *-signed-bitwise, *-union-access, *-magic-numbers, *-bounds-pointer-arithmetic, *-easily-swappable-parameters)
