@@ -5,8 +5,8 @@
 [![stats](https://badgen.net/github/stars/Sombian/string)](https://github.com/Sombian/string)
 [![stats](https://badgen.net/github/forks/Sombian/string)](https://github.com/Sombian/string)
 
-a header only string impl. requires **C++23** or later.  
-(compatible with following compilers: GCC, Clang, MSVC)  
+a header only string impl. requires C++23 or later.  
+🎉 *it is compatible with → `GCC`, `Clang`, `MSVC`*   
 
 ```c++
 #include "string.hpp"
@@ -19,13 +19,13 @@ int main() noexcept
 }
 ```
 
-## str
+## `str`
 
 `str` is a struct that owns the string content.  
 it can convert from, and to any available encoding encoded string.  
 likewise, all its API accepts any available encoding encoded string.  
 
-## txt
+## `txt`
 
 `txt` is a struct that holds ptr to the string.  
 it can convert from, and to any available encoding encoded string.  

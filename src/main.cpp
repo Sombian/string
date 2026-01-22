@@ -1,34 +1,33 @@
 #include <ranges>
 #include <variant>
 #include <iostream>
-#include <algorithm>
 
 #include "string.hpp"
 
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+// #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #ifndef DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 int main() noexcept
 {
-	const char8_t path[] {u8"./tests/utf8.txt"};
-
-	#ifdef _MSC_VER//############//;
-	std::system("chcp 65001 > NUL");
-	#endif//MSC_VER//############//;
-
-	std::visit([&](auto&& txt)
 	{
-		std::cout << txt << '\n';
-	},
-	utf::fileof(path).value());
+		utf::str str {u8"ABCDEFGHIJKLMNOPQRSTUVW"};
 
-	utf::str str {u8"두쫀쿠뵥뵥"};
+		for (auto code : std::ranges::subrange(str.begin(), str.end()))
+		{
+			code = U'♥'; std::cout << str << '\n';
+			code = U'?'; std::cout << str << '\n';
+		}
+	}
 
-	std::for_each(str.rbegin(), str.rend(), [](auto code) { std::cout << code; }); std::cout << '\n';
+	{
+		utf::str str {u8"ABCDEFGHIJKLMNOPQRSTUVW"};
 
-	for (auto [index, value] : std::views::enumerate(str)) { if (index % 2 == 0) { value = U'뷁'; } }
-
-	std::for_each(str.rbegin(), str.rend(), [](auto code) { std::cout << code; }); std::cout << '\n';
+		for (auto code : std::ranges::subrange(str.rbegin(), str.rend()))
+		{
+			code = U'♥'; std::cout << str << '\n';
+			code = U'?'; std::cout << str << '\n';
+		}
+	}
 }
 
 #endif//DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN

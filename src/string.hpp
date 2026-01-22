@@ -15,7 +15,6 @@
 #include <fstream>
 #include <iterator>
 #include <optional>
-#include <concepts>
 #include <algorithm>
 #include <filesystem>
 #include <type_traits>
@@ -141,9 +140,9 @@ template <> struct codec<"ASCII">
 	static constexpr auto back(const T* data) noexcept -> int8_t;
 
 	static constexpr auto // transform a code point into code units.
-	encode(const char32_t in, T* out, int8_t size) noexcept -> void;
+	encode(const char32_t in, T* out, int8_t step) noexcept -> void;
 	static constexpr auto // transform code units into a code point.
-	decode(const T* in, char32_t& out, int8_t size) noexcept -> void;
+	decode(const T* in, char32_t& out, int8_t step) noexcept -> void;
 };
 
 // https://en.wikipedia.org/wiki/UTF-8
@@ -161,9 +160,9 @@ template <> struct codec<"UTF-8">
 	static constexpr auto back(const T* data) noexcept -> int8_t;
 
 	static constexpr auto // transform a code point into code units.
-	encode(const char32_t in, T* out, int8_t size) noexcept -> void;
+	encode(const char32_t in, T* out, int8_t step) noexcept -> void;
 	static constexpr auto // transform code units into a code point.
-	decode(const T* in, char32_t& out, int8_t size) noexcept -> void;
+	decode(const T* in, char32_t& out, int8_t step) noexcept -> void;
 };
 
 // https://en.wikipedia.org/wiki/UTF-16
@@ -181,9 +180,9 @@ template <> struct codec<"UTF-16">
 	static constexpr auto back(const T* data) noexcept -> int8_t;
 
 	static constexpr auto // transform a code point into code units.
-	encode(const char32_t in, T* out, int8_t size) noexcept -> void;
+	encode(const char32_t in, T* out, int8_t step) noexcept -> void;
 	static constexpr auto // transform code units into a code point.
-	decode(const T* in, char32_t& out, int8_t size) noexcept -> void;
+	decode(const T* in, char32_t& out, int8_t step) noexcept -> void;
 };
 
 // https://en.wikipedia.org/wiki/UTF-32
@@ -201,9 +200,9 @@ template <> struct codec<"UTF-32">
 	static constexpr auto back(const T* data) noexcept -> int8_t;
 
 	static constexpr auto // transform a code point into code units.
-	encode(const char32_t in, T* out, int8_t size) noexcept -> void;
+	encode(const char32_t in, T* out, int8_t step) noexcept -> void;
 	static constexpr auto // transform code units into a code point.
-	decode(const T* in, char32_t& out, int8_t size) noexcept -> void;
+	decode(const T* in, char32_t& out, int8_t step) noexcept -> void;
 };
 
 template <typename Class /* CRTP core */> class API
@@ -220,26 +219,15 @@ template <typename Class /* CRTP core */> class API
 	//│       and it was deliberate; to cut bin bloat. │
 	//└────────────────────────────────────────────────┘
 
-	// stl compat? expr template
 	template <typename LHS, typename RHS> class concat;
-	// stl compat; bi-directional
+
 	class const_forward_iterator;
-	// stl compat; bi-directional
-	class /*&*/ forward_iterator;
-	// stl compat; bi-directional
 	class const_reverse_iterator;
-	// stl compat; bi-directional
-	class /*&*/ reverse_iterator;
 
 	constexpr auto head() const noexcept -> const T*;
 	constexpr auto tail() const noexcept -> const T*;
 
 public:
-
-	using const_forward_iterator_t = const_forward_iterator;
-	using /*&*/ forward_iterator_t = /*&*/ forward_iterator;
-	using const_reverse_iterator_t = const_reverse_iterator;
-	using /*&*/ reverse_iterator_t = /*&*/ reverse_iterator;
 	
 	// returns the number of code units, excluding NULL-TERMINATOR.
 	constexpr auto size() const noexcept -> size_t;
@@ -464,8 +452,7 @@ private:
 			// nothing to do...
 		}
 
-		template <typename Other,
-		          typename Arena>
+		template <typename Other, typename Arena>
 		constexpr operator str<Other, Arena>() const noexcept;
 
 		// operators
@@ -508,94 +495,38 @@ private:
 	public:
 
 		using iterator_category = std::bidirectional_iterator_tag;
+		using iterator_concept = std::bidirectional_iterator_tag;
 		// for STL algorithms; itrator trait
 		using difference_type = ptrdiff_t;
 		using value_type = char32_t;
 		using reference = char32_t;
-		using pointer = const T*;
 
 		constexpr const_forward_iterator
 		(
 			decltype(ptr) ptr
-			=
-			nullptr // for STL
 		)
 		noexcept : ptr {ptr} {}
 
+		// stl compat; must be default constructible
+		constexpr  const_forward_iterator() noexcept = default;
+		constexpr ~const_forward_iterator() noexcept = default;
+
 		constexpr auto operator*() const noexcept -> value_type;
 
-		constexpr auto operator++(   ) noexcept -> decltype(*this)&;
-		constexpr auto operator++(int) noexcept -> decltype(*this);
+		constexpr auto operator++(   ) noexcept -> const_forward_iterator&;
+		constexpr auto operator++(int) noexcept -> const_forward_iterator;
 
-		constexpr auto operator--(   ) noexcept -> decltype(*this)&;
-		constexpr auto operator--(int) noexcept -> decltype(*this);
+		constexpr auto operator--(   ) noexcept -> const_forward_iterator&;
+		constexpr auto operator--(int) noexcept -> const_forward_iterator;
 
-		constexpr auto operator+(size_t value) noexcept -> decltype(*this);
-		constexpr auto operator+=(size_t value) noexcept -> decltype(*this)&;
+		constexpr auto operator+(size_t value) noexcept -> const_forward_iterator;
+		constexpr auto operator-(size_t value) noexcept -> const_forward_iterator;
 
-		constexpr auto operator-(size_t value) noexcept -> decltype(*this);
-		constexpr auto operator-=(size_t value) noexcept -> decltype(*this)&;
+		constexpr auto operator+=(size_t value) noexcept -> const_forward_iterator&;
+		constexpr auto operator-=(size_t value) noexcept -> const_forward_iterator&;
 
 		constexpr auto operator==(const const_forward_iterator& rhs) const noexcept -> bool = default;
 		constexpr auto operator!=(const const_forward_iterator& rhs) const noexcept -> bool = default;
-	};
-
-	class /*&*/ forward_iterator
-	{
-		T* ptr;
-
-		class unicode
-		{
-			T* const ptr;
-
-		public:
-
-			constexpr unicode
-			(
-				decltype(ptr) ptr
-			)
-			noexcept : ptr {ptr} {}
-
-			[[nodiscard]] constexpr operator char32_t() const noexcept;
-			constexpr auto operator=(char32_t code) noexcept -> unicode&;
-
-			constexpr auto operator==(char32_t code) const noexcept -> bool;
-			constexpr auto operator!=(char32_t code) const noexcept -> bool;
-		};
-
-	public:
-
-		using iterator_category = std::bidirectional_iterator_tag;
-		// for STL algorithms; itrator trait
-		using difference_type = ptrdiff_t;
-		using value_type = unicode;
-		using reference = unicode;
-		using pointer = const T*;
-
-		constexpr forward_iterator
-		(
-			decltype(ptr) ptr
-			=
-			nullptr // for STL
-		)
-		noexcept : ptr {ptr} {}
-
-		constexpr auto operator*() const noexcept -> value_type;
-
-		constexpr auto operator++(   ) noexcept -> decltype(*this)&;
-		constexpr auto operator++(int) noexcept -> decltype(*this);
-
-		constexpr auto operator--(   ) noexcept -> decltype(*this)&;
-		constexpr auto operator--(int) noexcept -> decltype(*this);
-
-		constexpr auto operator+(size_t value) noexcept -> decltype(*this);
-		constexpr auto operator+=(size_t value) noexcept -> decltype(*this)&;
-
-		constexpr auto operator-(size_t value) noexcept -> decltype(*this);
-		constexpr auto operator-=(size_t value) noexcept -> decltype(*this)&;
-
-		constexpr auto operator==(const forward_iterator& rhs) const noexcept -> bool = default;
-		constexpr auto operator!=(const forward_iterator& rhs) const noexcept -> bool = default;
 	};
 
 	class const_reverse_iterator
@@ -605,94 +536,38 @@ private:
 	public:
 
 		using iterator_category = std::bidirectional_iterator_tag;
+		using iterator_concept = std::bidirectional_iterator_tag;
 		// for STL algorithms; itrator trait
 		using difference_type = ptrdiff_t;
 		using value_type = char32_t;
 		using reference = char32_t;
-		using pointer = const T*;
 
 		constexpr const_reverse_iterator
 		(
 			decltype(ptr) ptr
-			=
-			nullptr // for STL
 		)
 		noexcept : ptr {ptr} {}
 
+		// stl compat; must be default constructible
+		constexpr  const_reverse_iterator() noexcept = default;
+		constexpr ~const_reverse_iterator() noexcept = default;
+
 		constexpr auto operator*() const noexcept -> value_type;
 
-		constexpr auto operator++(   ) noexcept -> decltype(*this)&;
-		constexpr auto operator++(int) noexcept -> decltype(*this);
+		constexpr auto operator++(   ) noexcept -> const_reverse_iterator&;
+		constexpr auto operator++(int) noexcept -> const_reverse_iterator;
 
-		constexpr auto operator--(   ) noexcept -> decltype(*this)&;
-		constexpr auto operator--(int) noexcept -> decltype(*this);
+		constexpr auto operator--(   ) noexcept -> const_reverse_iterator&;
+		constexpr auto operator--(int) noexcept -> const_reverse_iterator;
 
-		constexpr auto operator+(size_t value) noexcept -> decltype(*this);
-		constexpr auto operator+=(size_t value) noexcept -> decltype(*this)&;
+		constexpr auto operator+(size_t value) noexcept -> const_reverse_iterator;
+		constexpr auto operator-(size_t value) noexcept -> const_reverse_iterator;
 
-		constexpr auto operator-(size_t value) noexcept -> decltype(*this);
-		constexpr auto operator-=(size_t value) noexcept -> decltype(*this)&;
+		constexpr auto operator+=(size_t value) noexcept -> const_reverse_iterator&;
+		constexpr auto operator-=(size_t value) noexcept -> const_reverse_iterator&;
 
 		constexpr auto operator==(const const_reverse_iterator& rhs) const noexcept -> bool = default;
 		constexpr auto operator!=(const const_reverse_iterator& rhs) const noexcept -> bool = default;
-	};
-
-	class /*&*/ reverse_iterator
-	{
-		T* ptr;
-
-		class unicode
-		{
-			T* const ptr;
-
-		public:
-
-			constexpr unicode
-			(
-				decltype(ptr) ptr
-			)
-			noexcept : ptr {ptr} {}
-
-			[[nodiscard]] constexpr operator char32_t() const noexcept;
-			constexpr auto operator=(char32_t code) noexcept -> unicode&;
-
-			constexpr auto operator==(char32_t code) const noexcept -> bool;
-			constexpr auto operator!=(char32_t code) const noexcept -> bool;
-		};
-
-	public:
-
-		using iterator_category = std::bidirectional_iterator_tag;
-		// for STL algorithms; itrator trait
-		using difference_type = ptrdiff_t;
-		using value_type = unicode;
-		using reference = unicode;
-		using pointer = const T*;
-
-		constexpr reverse_iterator
-		(
-			decltype(ptr) ptr
-			=
-			nullptr // for STL
-		)
-		noexcept : ptr {ptr} {}
-
-		constexpr auto operator*() const noexcept -> value_type;
-
-		constexpr auto operator++(   ) noexcept -> decltype(*this)&;
-		constexpr auto operator++(int) noexcept -> decltype(*this);
-
-		constexpr auto operator--(   ) noexcept -> decltype(*this)&;
-		constexpr auto operator--(int) noexcept -> decltype(*this);
-
-		constexpr auto operator+(size_t value) noexcept -> decltype(*this);
-		constexpr auto operator+=(size_t value) noexcept -> decltype(*this)&;
-
-		constexpr auto operator-(size_t value) noexcept -> decltype(*this);
-		constexpr auto operator-=(size_t value) noexcept -> decltype(*this)&;
-
-		constexpr auto operator==(const reverse_iterator& rhs) const noexcept -> bool = default;
-		constexpr auto operator!=(const reverse_iterator& rhs) const noexcept -> bool = default;
 	};
 };
 
@@ -785,10 +660,16 @@ template <typename Codec, typename Alloc> class str : public API<str<Codec, Allo
 
 	storage store;
 
-	friend class reader;
-	friend class writer;
+	class reader;
+	friend reader;
+	class writer;
+	friend writer;
 
-	// series of sanity checks
+	class forward_iterator;
+	friend forward_iterator;
+	class reverse_iterator;
+	friend reverse_iterator;
+
 	static_assert(sizeof(storage) == sizeof(buffer));
 	static_assert(std::is_standard_layout_v<buffer>);
 	static_assert(std::is_trivially_copyable_v<buffer>);
@@ -796,6 +677,17 @@ template <typename Codec, typename Alloc> class str : public API<str<Codec, Allo
 	static_assert(alignof(buffer) == alignof(size_t) * 1);
 	static_assert(offsetof(buffer, head) == sizeof(size_t) * 0);
 	static_assert(offsetof(buffer, tail) == sizeof(size_t) * 1);
+
+	template <typename Other>
+	constexpr auto __assign__(const typename Other::T* rhs_0,
+	                          const typename Other::T* rhs_N) noexcept -> void;
+
+	template <typename Other>
+	constexpr auto __concat__(const typename Other::T* rhs_0,
+	                          const typename Other::T* rhs_N) noexcept -> void;
+
+	// 2x capacity growth strategy; returns next ptr
+	constexpr auto __insert__(T* dest, char32_t code, int8_t step) noexcept -> T*;
 
 public:
 
@@ -850,14 +742,14 @@ public:
 	using API<str<Codec, Alloc>>::begin; // fix; name hiding
 	using API<str<Codec, Alloc>>::end; // fix; name hiding
 
-	constexpr auto begin() /*&*/ noexcept -> typename str::forward_iterator_t;
-	constexpr auto end() /*&*/ noexcept -> typename str::forward_iterator_t;
+	constexpr auto begin() /*&*/ noexcept -> forward_iterator;
+	constexpr auto end() /*&*/ noexcept -> forward_iterator;
 
 	using API<str<Codec, Alloc>>::rbegin; // fix; name hiding
 	using API<str<Codec, Alloc>>::rend; // fix; name hiding
 
-	constexpr auto rbegin() /*&*/ noexcept -> typename str::reverse_iterator_t;
-	constexpr auto rend() /*&*/ noexcept -> typename str::reverse_iterator_t;
+	constexpr auto rbegin() /*&*/ noexcept -> reverse_iterator;
+	constexpr auto rend() /*&*/ noexcept -> reverse_iterator;
 
 	// operators
 
@@ -965,11 +857,149 @@ private:
 		constexpr auto operator!=(char32_t code) const noexcept -> bool;
 	};
 
-	template <typename Other>
-	constexpr auto __assign__(const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> void;
+	class forward_iterator
+	{
+		using S = str<Codec, Alloc>;
 
-	template <typename Other>
-	constexpr auto __concat__(const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> void;
+		/*&&&*/ S*        src; // ← cmp
+		mutable T*        ptr;
+		mutable ptrdiff_t dif; // ← cmp
+
+		class proxy
+		{
+			using S = forward_iterator;
+
+			const S* const src;
+			/*&*/ T* /*&*/ ptr;
+
+		public:
+
+			constexpr proxy
+			(
+				decltype(src) src,
+				decltype(ptr) ptr
+			)
+			noexcept : src {src},
+			           ptr {ptr} {}
+
+			[[nodiscard]] constexpr operator char32_t() const noexcept;
+			constexpr auto operator=(char32_t code) noexcept -> proxy&;
+
+			constexpr auto operator==(char32_t code) const noexcept -> bool;
+			constexpr auto operator!=(char32_t code) const noexcept -> bool;
+		};
+
+	public:
+
+		using iterator_category = std::bidirectional_iterator_tag;
+		using iterator_concept = std::bidirectional_iterator_tag;
+		using difference_type = ptrdiff_t;
+		using value_type = proxy;
+		using reference = proxy;
+
+		constexpr forward_iterator
+		(
+			decltype(src) src,
+			decltype(ptr) ptr,
+			decltype(dif) dif
+		)
+		noexcept : src {src},
+		           ptr {ptr},
+		           dif {dif} {}
+
+		// stl compat; must be default constructible
+		constexpr  forward_iterator() noexcept = default;
+		constexpr ~forward_iterator() noexcept = default;
+
+		constexpr auto operator*() const noexcept -> value_type;
+
+		constexpr auto operator++(   ) noexcept -> forward_iterator&;
+		constexpr auto operator++(int) noexcept -> forward_iterator;
+
+		constexpr auto operator--(   ) noexcept -> forward_iterator&;
+		constexpr auto operator--(int) noexcept -> forward_iterator;
+
+		constexpr auto operator+(size_t value) noexcept -> forward_iterator;
+		constexpr auto operator-(size_t value) noexcept -> forward_iterator;
+
+		constexpr auto operator+=(size_t value) noexcept -> forward_iterator&;
+		constexpr auto operator-=(size_t value) noexcept -> forward_iterator&;
+
+		constexpr auto operator==(const forward_iterator& rhs) const noexcept -> bool;
+		constexpr auto operator!=(const forward_iterator& rhs) const noexcept -> bool;
+	};
+
+	class reverse_iterator
+	{
+		using S = str<Codec, Alloc>;
+
+		/*&&&*/ S*        src; // ← cmp
+		mutable T*        ptr;
+		mutable ptrdiff_t dif; // ← cmp
+
+		class proxy
+		{
+			using S = reverse_iterator;
+
+			const S* const src;
+			/*&*/ T* /*&*/ ptr;
+
+		public:
+
+			constexpr proxy
+			(
+				decltype(src) src,
+				decltype(ptr) ptr
+			)
+			noexcept : src {src},
+			           ptr {ptr} {}
+
+			[[nodiscard]] constexpr operator char32_t() const noexcept;
+			constexpr auto operator=(char32_t code) noexcept -> proxy&;
+
+			constexpr auto operator==(char32_t code) const noexcept -> bool;
+			constexpr auto operator!=(char32_t code) const noexcept -> bool;
+		};
+
+	public:
+
+		using iterator_category = std::bidirectional_iterator_tag;
+		using iterator_concept = std::bidirectional_iterator_tag;
+		using difference_type = ptrdiff_t;
+		using value_type = proxy;
+		using reference = proxy;
+
+		constexpr reverse_iterator
+		(
+			decltype(src) src,
+			decltype(ptr) ptr,
+			decltype(dif) dif
+		)
+		noexcept : src {src},
+		           ptr {ptr},
+		           dif {dif} {}
+
+		// stl compat; must be default constructible
+		constexpr  reverse_iterator() noexcept = default;
+		constexpr ~reverse_iterator() noexcept = default;
+
+		constexpr auto operator*() const noexcept -> value_type;
+
+		constexpr auto operator++(   ) noexcept -> reverse_iterator&;
+		constexpr auto operator++(int) noexcept -> reverse_iterator;
+
+		constexpr auto operator--(   ) noexcept -> reverse_iterator&;
+		constexpr auto operator--(int) noexcept -> reverse_iterator;
+
+		constexpr auto operator+(size_t value) noexcept -> reverse_iterator;
+		constexpr auto operator-(size_t value) noexcept -> reverse_iterator;
+
+		constexpr auto operator+=(size_t value) noexcept -> reverse_iterator&;
+		constexpr auto operator-=(size_t value) noexcept -> reverse_iterator&;
+
+		constexpr auto operator==(const reverse_iterator& rhs) const noexcept -> bool;
+		constexpr auto operator!=(const reverse_iterator& rhs) const noexcept -> bool;
+	};
 };
 
 template <typename Codec /* can't own */> class txt : public API<txt<Codec /*##*/>>
@@ -983,8 +1013,10 @@ template <typename Codec /* can't own */> class txt : public API<txt<Codec /*##*
 	const T* __head__;
 	const T* __tail__;
 
-	friend class reader;
-	friend class writer;
+	class reader;
+	friend reader;
+	class writer;
+	friend writer;
 
 public:
 
@@ -1207,9 +1239,9 @@ constexpr auto codec<"ASCII">::back([[maybe_unused]] const T* data) noexcept -> 
 	return -1;
 }
 
-constexpr auto codec<"ASCII">::encode(const char32_t in, T* out, int8_t size) noexcept -> void
+constexpr auto codec<"ASCII">::encode(const char32_t in, T* out, int8_t step) noexcept -> void
 {
-	switch (size)
+	switch (step)
 	{
 		case +1:
 		{
@@ -1226,9 +1258,9 @@ constexpr auto codec<"ASCII">::encode(const char32_t in, T* out, int8_t size) no
 	}
 }
 
-constexpr auto codec<"ASCII">::decode(const T* in, char32_t& out, int8_t size) noexcept -> void
+constexpr auto codec<"ASCII">::decode(const T* in, char32_t& out, int8_t step) noexcept -> void
 {
-	switch (size)
+	switch (step)
 	{
 		case +1:
 		{
@@ -1291,9 +1323,9 @@ constexpr auto codec<"UTF-8">::back([[maybe_unused]] const T* data) noexcept -> 
 	return i;
 }
 
-constexpr auto codec<"UTF-8">::encode(const char32_t in, T* out, int8_t size) noexcept -> void
+constexpr auto codec<"UTF-8">::encode(const char32_t in, T* out, int8_t step) noexcept -> void
 {
-	switch (size)
+	switch (step)
 	{
 		case +1:
 		{
@@ -1352,9 +1384,9 @@ constexpr auto codec<"UTF-8">::encode(const char32_t in, T* out, int8_t size) no
 	}
 }
 
-constexpr auto codec<"UTF-8">::decode(const T* in, char32_t& out, int8_t size) noexcept -> void
+constexpr auto codec<"UTF-8">::decode(const T* in, char32_t& out, int8_t step) noexcept -> void
 {
-	switch (size)
+	switch (step)
 	{
 		case +1:
 		{
@@ -1453,9 +1485,9 @@ constexpr auto codec<"UTF-16">::back([[maybe_unused]] const T* data) noexcept ->
 	return i;
 }
 
-constexpr auto codec<"UTF-16">::encode(const char32_t in, T* out, int8_t size) noexcept -> void
+constexpr auto codec<"UTF-16">::encode(const char32_t in, T* out, int8_t step) noexcept -> void
 {
-	switch (size)
+	switch (step)
 	{
 		case +1:
 		{
@@ -1485,9 +1517,9 @@ constexpr auto codec<"UTF-16">::encode(const char32_t in, T* out, int8_t size) n
 	}
 }
 
-constexpr auto codec<"UTF-16">::decode(const T* in, char32_t& out, int8_t size) noexcept -> void
+constexpr auto codec<"UTF-16">::decode(const T* in, char32_t& out, int8_t step) noexcept -> void
 {
-	switch (size)
+	switch (step)
 	{
 		case +1:
 		{
@@ -1540,9 +1572,9 @@ constexpr auto codec<"UTF-32">::back([[maybe_unused]] const T* data) noexcept ->
 	return -1;
 }
 
-constexpr auto codec<"UTF-32">::encode(const char32_t in, T* out, int8_t size) noexcept -> void
+constexpr auto codec<"UTF-32">::encode(const char32_t in, T* out, int8_t step) noexcept -> void
 {
-	switch (size)
+	switch (step)
 	{
 		case +1:
 		{
@@ -1559,9 +1591,9 @@ constexpr auto codec<"UTF-32">::encode(const char32_t in, T* out, int8_t size) n
 	}
 }
 
-constexpr auto codec<"UTF-32">::decode(const T* in, char32_t& out, int8_t size) noexcept -> void
+constexpr auto codec<"UTF-32">::decode(const T* in, char32_t& out, int8_t step) noexcept -> void
 {
-	switch (size)
+	switch (step)
 	{
 		case +1:
 		{
@@ -2083,7 +2115,7 @@ template <size_t                       N> constexpr auto API<Class>::concat<LHS,
 }
 
 #pragma endregion CRTP::concat
-#pragma region CRTP::const_ltr_it
+#pragma region CRTP::const_forward_iterator
 
 template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator*() const noexcept -> value_type
 {
@@ -2094,82 +2126,78 @@ template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forwa
 	return code;
 }
 
-template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator++(   ) noexcept -> decltype(*this)&
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator++(   ) noexcept -> const_forward_iterator&
 {
-	this->ptr += Codec::next(this->ptr); return *this;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator++(int) noexcept -> decltype(*this)
-{
-	const auto clone {*this}; operator++(); return clone;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator--(   ) noexcept -> decltype(*this)&
-{
-	this->ptr += Codec::back(this->ptr); return *this;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator--(int) noexcept -> decltype(*this)
-{
-	const auto clone {*this}; operator--(); return clone;
-}
-
-#pragma endregion CRTP::const_ltr_it
-#pragma region CRTP::ltr_it
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::operator*() const noexcept -> value_type
-{
-	return {this->ptr};
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::operator++(   ) noexcept -> decltype(*this)&
-{
-	this->ptr += Codec::next(this->ptr); return *this;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::operator++(int) noexcept -> decltype(*this)
-{
-	const auto clone {*this}; operator++(); return clone;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::operator--(   ) noexcept -> decltype(*this)&
-{
-	this->ptr += Codec::back(this->ptr); return *this;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::operator--(int) noexcept -> decltype(*this)
-{
-	const auto clone {*this}; operator--(); return clone;
-}
-
-template <typename Class /* CRTP core */> [[nodiscard]] constexpr API<Class>::forward_iterator::unicode::operator char32_t() const noexcept
-{
-	char32_t code;
-
-	Codec::decode(this->ptr, code, Codec::next(this->ptr));
-
-	return code;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::unicode::operator=(char32_t code) noexcept -> unicode&
-{
-	Codec::encode(code, this->ptr, Codec::next(this->ptr));
+	this->ptr += Codec::next(this->ptr);
 
 	return *this;
 }
 
-template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::unicode::operator==(char32_t code) const noexcept -> bool
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator++(int) noexcept -> const_forward_iterator
 {
-	return this->operator char32_t() == code;
+	const auto clone {*this};
+
+	operator++();
+	return clone;
 }
 
-template <typename Class /* CRTP core */> constexpr auto API<Class>::forward_iterator::unicode::operator!=(char32_t code) const noexcept -> bool
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator--(   ) noexcept -> const_forward_iterator&
 {
-	return this->operator char32_t() != code;
+	this->ptr += Codec::back(this->ptr);
+
+	return *this;
 }
 
-#pragma endregion CRTP::ltr_it
-#pragma region CRTP::const_rtl_it
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator--(int) noexcept -> const_forward_iterator
+{
+	const auto clone {*this};
+	
+	operator--();
+	return clone;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator+(size_t value) noexcept -> const_forward_iterator
+{
+	const auto clone {*this};
+
+	for (size_t i {0}; i < value; ++i)
+	{
+		++clone;
+	}
+	return clone;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator-(size_t value) noexcept -> const_forward_iterator
+{
+	const auto clone {*this};
+
+	for (size_t i {0}; i < value; ++i)
+	{
+		--clone;
+	}
+	return clone;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator+=(size_t value) noexcept -> const_forward_iterator&
+{
+	for (size_t i {0}; i < value; ++i)
+	{
+		++(*this);
+	}
+	return *this;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_forward_iterator::operator-=(size_t value) noexcept -> const_forward_iterator&
+{
+	for (size_t i {0}; i < value; ++i)
+	{
+		--(*this);
+	}
+	return *this;
+}
+
+#pragma endregion CRTP::const_forward_iterator
+#pragma region CRTP::const_reverse_iterator
 
 template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator*() const noexcept -> value_type
 {
@@ -2180,81 +2208,77 @@ template <typename Class /* CRTP core */> constexpr auto API<Class>::const_rever
 	return code;
 }
 
-template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator++(   ) noexcept -> decltype(*this)&
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator++(   ) noexcept -> const_reverse_iterator&
 {
-	this->ptr += Codec::back(this->ptr); return *this;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator++(int) noexcept -> decltype(*this)
-{
-	const auto clone {*this}; operator++(); return clone;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator--(   ) noexcept -> decltype(*this)&
-{
-	this->ptr += Codec::next(this->ptr); return *this;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator--(int) noexcept -> decltype(*this)
-{
-	const auto clone {*this}; operator--(); return clone;
-}
-
-#pragma endregion CRTP::const_rtl_it
-#pragma region CRTP::rtl_it
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::operator*() const noexcept -> value_type
-{
-	return {this->ptr};
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::operator++(   ) noexcept -> decltype(*this)&
-{
-	this->ptr += Codec::back(this->ptr); return *this;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::operator++(int) noexcept -> decltype(*this)
-{
-	const auto clone {*this}; operator++(); return clone;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::operator--(   ) noexcept -> decltype(*this)&
-{
-	this->ptr += Codec::next(this->ptr); return *this;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::operator--(int) noexcept -> decltype(*this)
-{
-	const auto clone {*this}; operator--(); return clone;
-}
-
-template <typename Class /* CRTP core */> [[nodiscard]] constexpr API<Class>::reverse_iterator::unicode::operator char32_t() const noexcept
-{
-	char32_t code;
-
-	Codec::decode(this->ptr, code, Codec::back(this->ptr));
-
-	return code;
-}
-
-template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::unicode::operator=(char32_t code) noexcept -> unicode&
-{
-	Codec::encode(code, this->ptr, Codec::back(this->ptr));
+	this->ptr += Codec::back(this->ptr);
 
 	return *this;
 }
 
-template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::unicode::operator==(char32_t code) const noexcept -> bool
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator++(int) noexcept -> const_reverse_iterator
 {
-	return this->operator char32_t() == code;
+	const auto clone {*this};
+
+	operator++();
+	return clone;
 }
 
-template <typename Class /* CRTP core */> constexpr auto API<Class>::reverse_iterator::unicode::operator!=(char32_t code) const noexcept -> bool
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator--(   ) noexcept -> const_reverse_iterator&
 {
-	return this->operator char32_t() != code;
+	this->ptr += Codec::next(this->ptr);
+
+	return *this;
 }
 
-#pragma endregion CRTP::rtl_it
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator--(int) noexcept -> const_reverse_iterator
+{
+	const auto clone {*this};
+
+	operator--();
+	return clone;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator+(size_t value) noexcept -> const_reverse_iterator
+{
+	const auto clone {*this};
+
+	for (size_t i {0}; i < value; ++i)
+	{
+		++clone;
+	}
+	return clone;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator-(size_t value) noexcept -> const_reverse_iterator
+{
+	const auto clone {*this};
+
+	for (size_t i {0}; i < value; ++i)
+	{
+		--clone;
+	}
+	return clone;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator+=(size_t value) noexcept -> const_reverse_iterator&
+{
+	for (size_t i {0}; i < value; ++i)
+	{
+		++(*this);
+	}
+	return *this;
+}
+
+template <typename Class /* CRTP core */> constexpr auto API<Class>::const_reverse_iterator::operator-=(size_t value) noexcept -> const_reverse_iterator&
+{
+	for (size_t i {0}; i < value; ++i)
+	{
+		--(*this);
+	}
+	return *this;
+}
+
+#pragma endregion CRTP::const_reverse_iterator
 #pragma region CRTP::detail
 
 template <typename Codec> constexpr auto detail::__difcu__(const typename Codec::T* head, const typename Codec::T* tail) noexcept -> size_t
@@ -2304,46 +2328,47 @@ template <typename Codec,
 
 	if constexpr (std::is_same_v<Codec, Other>)
 	{
-		std::ranges::copy/*forward*/
-		(
-			head,
-			tail,
-			dest
-		);
+		const U* ptr {head};
+		/*&*/ T* out {dest};
+
+		for (; ptr <= tail; ++ptr, ++out)
+		{
+			*out = *ptr;
+		}
 
 		return __difcu__<Codec>(head, tail);
 	}
 
 	if constexpr (!std::is_same_v<Codec, Other>)
 	{
-		T* last {dest};
+		T* out {dest};
 
-		// for (const U* sync {head}; sync < tail; )
+		// for (const U* ptr {head}; ptr < tail; )
 		// {
 		// 	char32_t code;
 
-		// 	const auto U_size {Other::next(sync)};
-		// 	Other::decode(sync, code, U_size);
-		// 	const auto T_size {Codec::size(code)};
+		// 	const auto U_step {Other::next(ptr)};
+		// 	Other::decode(ptr, code, U_step);
+		// 	const auto T_step {Codec::size(code)};
 
-		// 	sync += U_size;
-		// 	last += T_size;
+		// 	ptr += U_step;
+		// 	out += T_step;
 		// }
 
-		for (const U* sync {head}; sync < tail; )
+		for (const U* ptr {head}; ptr < tail; )
 		{
 			char32_t code;
 
-			const auto U_size {Other::next(sync)};
-			Other::decode(sync, code, U_size);
-			const auto T_size {Codec::size(code)};
-			Codec::encode(code, last, T_size);
+			const auto U_step {Other::next(ptr)};
+			Other::decode(ptr, code, U_step);
+			const auto T_step {Codec::size(code)};
+			Codec::encode(code, out, T_step);
 
-			sync += U_size;
-			last += T_size;
+			ptr += U_step;
+			out += T_step;
 		}
 
-		return __difcu__<Codec>(dest, last);
+		return __difcu__<Codec>(dest, out);
 	}
 }
 
@@ -2356,46 +2381,47 @@ template <typename Codec,
 
 	if constexpr (std::is_same_v<Codec, Other>)
 	{
-		std::ranges::copy_backward
-		(
-			head,
-			tail,
-			dest
-		);
+		const U* ptr {head + (tail - head)};
+		/*&*/ T* out {dest + (tail - head)};
+
+		for (; head <= ptr; --ptr, --out)
+		{
+			*out = *ptr;
+		}
 
 		return __difcu__<Codec>(head, tail);
 	}
 
 	if constexpr (!std::is_same_v<Codec, Other>)
 	{
-		T* last {dest};
+		T* out {dest};
 
-		for (const U* sync {head}; sync < tail; )
+		for (const U* ptr {head}; ptr < tail; )
 		{
 			char32_t code;
 
-			const auto U_size {Other::next(sync)};
-			Other::decode(sync, code, U_size);
-			const auto T_size {Codec::size(code)};
+			const auto U_step {Other::next(ptr)};
+			Other::decode(ptr, code, U_step);
+			const auto T_step {Codec::size(code)};
 
-			sync += U_size;
-			last += T_size;
+			ptr += U_step;
+			out += T_step;
 		}
 
-		for (const U* sync {tail}; head < sync; )
+		for (const U* ptr {tail}; head < ptr; )
 		{
 			char32_t code;
 
-			const auto U_size {Other::back(sync)};
-			Other::decode(sync, code, U_size);
-			const auto T_size {Codec::size(code)};
-			Codec::encode(code, last, T_size);
+			const auto U_step {Other::back(ptr)};
+			Other::decode(ptr, code, U_step);
+			const auto T_step {Codec::size(code)};
+			Codec::encode(code, out, T_step);
 
-			sync += U_size;
-			last += T_size;
+			ptr += U_step;
+			out += T_step;
 		}
 
-		return __difcu__<Codec>(dest, last);
+		return __difcu__<Codec>(dest, out);
 	}
 }
 
@@ -2432,19 +2458,19 @@ template <typename Codec,
 			char32_t T_code;
 			char32_t U_code;
 
-			const auto T_size {Codec::next(lhs_ptr)};
-			const auto U_size {Other::next(rhs_ptr)};
+			const auto T_step {Codec::next(lhs_ptr)};
+			const auto U_step {Other::next(rhs_ptr)};
 
-			Codec::decode(lhs_ptr, T_code, T_size);
-			Other::decode(rhs_ptr, U_code, U_size);
+			Codec::decode(lhs_ptr, T_code, T_step);
+			Other::decode(rhs_ptr, U_code, U_step);
 
 			if (T_code != U_code)
 			{
 				return false;
 			}
 
-			lhs_ptr += T_size;
-			rhs_ptr += U_size;
+			lhs_ptr += T_step;
+			rhs_ptr += U_step;
 		}
 
 		return lhs_ptr == lhs_N && rhs_ptr == rhs_N;
@@ -2484,19 +2510,19 @@ template <typename Codec,
 			char32_t T_code;
 			char32_t U_code;
 
-			const auto T_size {Codec::next(lhs_ptr)};
-			const auto U_size {Other::next(rhs_ptr)};
+			const auto T_step {Codec::next(lhs_ptr)};
+			const auto U_step {Other::next(rhs_ptr)};
 
-			Codec::decode(lhs_ptr, T_code, T_size);
-			Other::decode(rhs_ptr, U_code, U_size);
+			Codec::decode(lhs_ptr, T_code, T_step);
+			Other::decode(rhs_ptr, U_code, U_step);
 
 			if (T_code != U_code)
 			{
 				return true;
 			}
 
-			lhs_ptr += T_size;
-			rhs_ptr += U_size;
+			lhs_ptr += T_step;
+			rhs_ptr += U_step;
 		}
 
 		return lhs_ptr != lhs_N || rhs_ptr != rhs_N;
@@ -2537,19 +2563,19 @@ template <typename Codec,
 			char32_t T_code;
 			char32_t U_code;
 
-			const auto T_size {Codec::next(lhs_ptr)};
-			const auto U_size {Other::next(rhs_ptr)};
+			const auto T_step {Codec::next(lhs_ptr)};
+			const auto U_step {Other::next(rhs_ptr)};
 
-			Codec::decode(lhs_ptr, T_code, T_size);
-			Other::decode(rhs_ptr, U_code, U_size);
+			Codec::decode(lhs_ptr, T_code, T_step);
+			Other::decode(rhs_ptr, U_code, U_step);
 
 			if (T_code != U_code)
 			{
 				return false;
 			}
 
-			lhs_ptr += T_size;
-			rhs_ptr += U_size;
+			lhs_ptr += T_step;
+			rhs_ptr += U_step;
 		}
 
 		return rhs_ptr == rhs_N;
@@ -2590,19 +2616,19 @@ template <typename Codec,
 			char32_t T_code;
 			char32_t U_code;
 
-			const auto T_size {Codec::back(lhs_ptr)};
-			const auto U_size {Other::back(rhs_ptr)};
+			const auto T_step {Codec::back(lhs_ptr)};
+			const auto U_step {Other::back(rhs_ptr)};
 
-			Codec::decode(lhs_ptr, T_code, T_size);
-			Other::decode(rhs_ptr, U_code, U_size);
+			Codec::decode(lhs_ptr, T_code, T_step);
+			Other::decode(rhs_ptr, U_code, U_step);
 
 			if (T_code != U_code)
 			{
 				return false;
 			}
 
-			lhs_ptr += T_size;
-			rhs_ptr += U_size;
+			lhs_ptr += T_step;
+			rhs_ptr += U_step;
 		}
 
 		return rhs_ptr == rhs_0;
@@ -3230,24 +3256,24 @@ template <size_t                       N> constexpr str<Codec, Alloc>::str(__32S
 	this->operator=(str);
 }
 
-template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::begin() /*&*/ noexcept -> typename str::forward_iterator_t
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::begin() /*&*/ noexcept -> forward_iterator
 {
-	return {this->__head__()};
+	return {this, this->__head__(), static_cast<ptrdiff_t>(0)};
 }
 
-template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::end() /*&*/ noexcept -> typename str::forward_iterator_t
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::end() /*&*/ noexcept -> forward_iterator
 {
-	return {this->__tail__()};
+	return {this, this->__tail__(), static_cast<ptrdiff_t>(this->length())};
 }
 
-template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::rbegin() /*&*/ noexcept -> typename str::reverse_iterator_t
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::rbegin() /*&*/ noexcept -> reverse_iterator
 {
-	return {this->__tail__()};
+	return {this, this->__tail__(), static_cast<ptrdiff_t>(0)};
 }
 
-template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::rend() /*&*/ noexcept -> typename str::reverse_iterator_t
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::rend() /*&*/ noexcept -> reverse_iterator
 {
-	return {this->__head__()};
+	return {this, this->__head__(), static_cast<ptrdiff_t>(this->length())};
 }
 
 template <typename Codec, typename Alloc>
@@ -3259,7 +3285,7 @@ template <typename Other, typename Arena> constexpr auto str<Codec, Alloc>::oper
 template <typename Codec, typename Alloc>
 template <typename Other /* can't own */> constexpr auto str<Codec, Alloc>::operator=(__SLICE__(rhs))& noexcept -> str&
 {
-	this->__assign__<Other>(rhs.__head__, rhs.__tail__); return *this;
+	this->__assign__<Other>(rhs.__head__  , rhs.__tail__  ); return *this;
 }
 
 template <typename Codec, typename Alloc>
@@ -3331,7 +3357,7 @@ template <typename Other, typename Arena> constexpr auto str<Codec, Alloc>::oper
 template <typename Codec, typename Alloc>
 template <typename Other /* can't own */> constexpr auto str<Codec, Alloc>::operator+=(__SLICE__(rhs))& noexcept -> str&
 {
-	this->__concat__<Other>(rhs.__head__, rhs.__tail__); return *this;
+	this->__concat__<Other>(rhs.__head__  , rhs.__tail__  ); return *this;
 }
 
 template <typename Codec, typename Alloc>
@@ -3395,7 +3421,8 @@ template <size_t                       N> constexpr auto str<Codec, Alloc>::oper
 }
 
 template <typename Codec, typename Alloc>
-template <typename Other /* can't own */> constexpr auto str<Codec, Alloc>::__assign__(const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> void
+template <typename Other /* can't own */> constexpr auto str<Codec, Alloc>::__assign__(const typename Other::T* rhs_0,
+                                                                                       const typename Other::T* rhs_N) noexcept -> void
 {
 	const txt<Other> rhs {rhs_0, rhs_N};
 
@@ -3408,13 +3435,20 @@ template <typename Other /* can't own */> constexpr auto str<Codec, Alloc>::__as
 
 	this->capacity(size);
 
-	detail::__fcopy__<Codec, Other>(rhs_0, rhs_N, this->__head__());
+	detail::__fcopy__<Codec,
+	                  Other>
+	(
+		rhs_0, // &rhs[0]
+		rhs_N, // &rhs[N]
+		this->__head__()
+	);
 
 	this->__size__(size);
 }
 
 template <typename Codec, typename Alloc>
-template <typename Other /* can't own */> constexpr auto str<Codec, Alloc>::__concat__(const typename Other::T* rhs_0, const typename Other::T* rhs_N) noexcept -> void
+template <typename Other /* can't own */> constexpr auto str<Codec, Alloc>::__concat__(const typename Other::T* rhs_0,
+                                                                                       const typename Other::T* rhs_N) noexcept -> void
 {
 	const txt<Other> rhs {rhs_0, rhs_N};
 
@@ -3427,17 +3461,429 @@ template <typename Other /* can't own */> constexpr auto str<Codec, Alloc>::__co
 
 	this->capacity(size);
 
-	detail::__fcopy__<Codec, Other>(rhs_0, rhs_N, this->__tail__());
+	detail::__fcopy__<Codec,
+	                  Other>
+	(
+		rhs_0, // &rhs[0]
+		rhs_N, // &rhs[N]
+		this->__tail__()
+	);
 
 	this->__size__(size);
 }
 
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::__insert__(T* dest, char32_t code, int8_t step) noexcept -> T*
+{
+	const T* tail {this->__tail__()};
+
+	const auto a {0 < step // abs with T=int8_t
+	              ?
+	              static_cast<int8_t>(+step)
+	              :
+	              static_cast<int8_t>(-step)};
+
+	const auto b {Codec::size(code)};
+
+	/**/ if (a < b)
+	{
+		const auto old_l {this->size()};
+		const auto new_l {old_l - a + b};
+
+		if (this->capacity() <= new_l)
+		{
+			/**/ if (0 < step)
+			{
+				const auto delta {dest - this->__head__()};
+
+				// 2x current capacity
+				this->capacity(old_l * 2);
+
+				dest = this->__head__() + delta;
+				tail = this->__tail__()        ;
+			}
+			else if (step < 0)
+			{
+				const auto delta {this->__tail__() - dest};
+
+				// 2x current capacity
+				this->capacity(old_l * 2);
+
+				dest = this->__tail__() - delta;
+				tail = this->__tail__()        ;
+			}
+		}
+
+		/**/ if (0 < step)
+		{
+			//                       dest
+			//                       ↓
+			//┌────────┬─────────────┬───┬──────────────┬────────┐
+			//│ <head> │ left buffer │ A │ right buffer │ <tail> │
+			//├────────┼─────────────┼───┴───┬──────────┴───┬────┴───┐
+			//│ <head> │ left buffer │ [[B]] │ right buffer │ <tail> │
+			//└────────┴─────────────┴───────┴──────────────┴────────┘
+			//                       ↑
+			//                       slot
+
+			T* const slot {dest};
+
+			detail::__rcopy__<Codec,
+			                  Codec>
+			(
+				dest + a,
+				tail + 0,
+				dest + b
+			);
+			this->__size__(new_l);
+
+			// write code point at slot
+			Codec::encode(code, slot, +b);
+
+			return slot;
+		}
+		else if (step < 0)
+		{
+			//                           dest
+			//                           ↓
+			//┌────────┬─────────────┬───┬──────────────┬────────┐
+			//│ <head> │ left buffer │ A │ right buffer │ <tail> │
+			//├────────┼─────────────┼───┴───┬──────────┴───┬────┴───┐
+			//│ <head> │ left buffer │ [[B]] │ right buffer │ <tail> │
+			//└────────┴─────────────┴───────┴──────────────┴────────┘
+			//                               ↑
+			//                               slot
+
+			T* const slot {dest - a + b};
+
+			detail::__rcopy__<Codec,
+			                  Codec>
+			(
+				dest - 0 + 0,
+				tail - 0 + 0,
+				dest - a + b
+			);
+			this->__size__(new_l);
+
+			// write code point at slot
+			Codec::encode(code, slot, -b);
+
+			return slot;
+		}
+	}
+	else if (b < a)
+	{
+		const auto old_l {this->size()};
+		const auto new_l {old_l - a + b};
+
+		/**/ if (0 < step)
+		{
+			//                       dest
+			//                       ↓
+			//┌────────┬─────────────┬───────┬──────────────┬────────┐
+			//│ <head> │ left buffer │ [[A]] │ right buffer │ <tail> │
+			//├────────┼─────────────┼───┬───┴──────────┬───┴────┬───┘
+			//│ <head> │ left buffer │ B │ right buffer │ <tail> │
+			//└────────┴─────────────┴───┴──────────────┴────────┘
+			//                       ↑
+			//                       slot
+
+			T* const slot {dest};
+
+			detail::__fcopy__<Codec,
+			                  Codec>
+			(
+				dest + a,
+				tail + 0,
+				dest + b
+			);
+			this->__size__(new_l);
+
+			// write code point at slot
+			Codec::encode(code, slot, +b);
+
+			return slot;
+		}
+		else if (step < 0)
+		{
+			//                               dest
+			//                               ↓
+			//┌────────┬─────────────┬───────┬──────────────┬────────┐
+			//│ <head> │ left buffer │ [[A]] │ right buffer │ <tail> │
+			//├────────┼─────────────┼───┬───┴──────────┬───┴────┬───┘
+			//│ <head> │ left buffer │ B │ right buffer │ <tail> │
+			//└────────┴─────────────┴───┴──────────────┴────────┘
+			//                           ↑
+			//                           slot
+
+			T* const slot {dest - a + b};
+
+			detail::__fcopy__<Codec,
+			                  Codec>
+			(
+				dest - 0 + 0,
+				tail - 0 + 0,
+				dest - a + b
+			);
+			this->__size__(new_l);
+
+			// write code point at slot
+			Codec::encode(code, slot, -b);
+
+			return slot;
+		}
+	}
+
+	// no need to shift buffer :D
+	Codec::encode(code, dest, step);
+
+	return dest;
+}
+
 #pragma endregion str
-#pragma region txt
+#pragma region str::forward_iterator
 
-// nothing to do...
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::operator*() const noexcept -> value_type
+{
+	return {this, this->ptr}; // ← proxy
+}
 
-#pragma endregion txt
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::operator++(   ) noexcept -> forward_iterator&
+{
+	  this->ptr += Codec::next(this->ptr);
+
+	++this->dif;
+
+	return *this;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::operator++(int) noexcept -> forward_iterator
+{
+	const auto clone {*this};
+
+	operator++();
+	return clone;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::operator--(   ) noexcept -> forward_iterator&
+{
+	  this->ptr += Codec::back(this->ptr);
+
+	--this->dif;
+
+	return *this;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::operator--(int) noexcept -> forward_iterator
+{
+	const auto clone {*this};
+
+	operator--();
+	return clone;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::operator+(size_t value) noexcept -> forward_iterator
+{
+	const auto clone {*this};
+
+	for (size_t i {0}; i < value; ++i)
+	{
+		++clone;
+	}
+	return clone;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::operator-(size_t value) noexcept -> forward_iterator
+{
+	const auto clone {*this};
+
+	for (size_t i {0}; i < value; ++i)
+	{
+		--clone;
+	}
+	return clone;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::operator+=(size_t value) noexcept -> forward_iterator&
+{
+	for (size_t i {0}; i < value; ++i)
+	{
+		++(*this);
+	}
+	return *this;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::operator-=(size_t value) noexcept -> forward_iterator&
+{
+	for (size_t i {0}; i < value; ++i)
+	{
+		--(*this);
+	}
+	return *this;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::operator==(const forward_iterator& rhs) const noexcept -> bool
+{
+	return this->src == rhs.src && this->dif == rhs.dif;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::operator!=(const forward_iterator& rhs) const noexcept -> bool
+{
+	return this->src != rhs.src || this->dif != rhs.dif;
+}
+
+template <typename Codec, typename Alloc> [[nodiscard]] constexpr str<Codec, Alloc>::forward_iterator::proxy::operator char32_t() const noexcept
+{
+	char32_t code;
+
+	Codec::decode(this->ptr, code, Codec::next(this->ptr));
+
+	return code;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::proxy::operator=(char32_t code) noexcept -> proxy&
+{
+	const auto step {Codec::next(this->ptr)};
+
+	this->src->ptr = this->ptr = this->src
+	->
+	src->__insert__(this->ptr, code, step);
+
+	return *this;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::proxy::operator==(char32_t code) const noexcept -> bool
+{
+	return this->operator char32_t() == code;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::forward_iterator::proxy::operator!=(char32_t code) const noexcept -> bool
+{
+	return this->operator char32_t() != code;
+}
+
+#pragma endregion str::forward_iterator
+#pragma region str::reverse_iterator
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::operator*() const noexcept -> value_type
+{
+	return {this, this->ptr}; // ← proxy
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::operator++(   ) noexcept -> reverse_iterator&
+{
+	  this->ptr += Codec::back(this->ptr);
+
+	++this->dif;
+
+	return *this;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::operator++(int) noexcept -> reverse_iterator
+{
+	const auto clone {*this};
+
+	operator++();
+	return clone;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::operator--(   ) noexcept -> reverse_iterator&
+{
+	  this->ptr += Codec::next(this->ptr);
+
+	--this->dif;
+
+	return *this;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::operator--(int) noexcept -> reverse_iterator
+{
+	const auto clone {*this};
+
+	operator--();
+	return clone;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::operator+(size_t value) noexcept -> reverse_iterator
+{
+	const auto clone {*this};
+
+	for (size_t i {0}; i < value; ++i)
+	{
+		++clone;
+	}
+	return clone;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::operator-(size_t value) noexcept -> reverse_iterator
+{
+	const auto clone {*this};
+
+	for (size_t i {0}; i < value; ++i)
+	{
+		--clone;
+	}
+	return clone;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::operator+=(size_t value) noexcept -> reverse_iterator&
+{
+	for (size_t i {0}; i < value; ++i)
+	{
+		++(*this);
+	}
+	return *this;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::operator-=(size_t value) noexcept -> reverse_iterator&
+{
+	for (size_t i {0}; i < value; ++i)
+	{
+		--(*this);
+	}
+	return *this;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::operator==(const reverse_iterator& rhs) const noexcept -> bool
+{
+	return this->src == rhs.src && this->dif == rhs.dif;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::operator!=(const reverse_iterator& rhs) const noexcept -> bool
+{
+	return this->src != rhs.src || this->dif != rhs.dif;
+}
+
+template <typename Codec, typename Alloc> [[nodiscard]] constexpr str<Codec, Alloc>::reverse_iterator::proxy::operator char32_t() const noexcept
+{
+	char32_t code;
+
+	Codec::decode(this->ptr, code, Codec::back(this->ptr));
+
+	return code;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::proxy::operator=(char32_t code) noexcept -> proxy&
+{
+	const auto step {Codec::back(this->ptr)};
+
+	this->src->ptr = this->ptr = this->src
+	->
+	src->__insert__(this->ptr, code, step);
+
+	return *this;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::proxy::operator==(char32_t code) const noexcept -> bool
+{
+	return this->operator char32_t() == code;
+}
+
+template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::reverse_iterator::proxy::operator!=(char32_t code) const noexcept -> bool
+{
+	return this->operator char32_t() != code;
+}
+
+#pragma endregion str::reverse_iterator
 #pragma region str::reader
 
 template <typename Codec, typename Alloc> [[nodiscard]] constexpr str<Codec, Alloc>::reader::operator char32_t() const noexcept
@@ -3465,12 +3911,12 @@ template <typename Codec, typename Alloc> [[nodiscard]] constexpr str<Codec, All
 		{
 			__SHORTCUT__:
 
-			char32_t T_code;
+			char32_t code;
 
-			const auto T_size {Codec::next(head)};
-			Codec::decode(head, T_code, T_size);
+			const auto step {Codec::next(head)};
+			Codec::decode(head, code, step);
 
-			return T_code;
+			return code;
 		}
 	}
 	return U'\0';
@@ -3514,70 +3960,10 @@ template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::writ
 		{
 			__SHORTCUT__:
 
-			const auto a {Codec::next(head)};
-			const auto b {Codec::size(code)};
+			const auto step {Codec::next(head)};
+			this->src->__insert__(head, code, step);
 
-			if (a == b)
-			{
-				// no need to shift
-			}
-			else if (a < b)
-			{
-				//┌───┬───────────┐
-				//│ a │ buffer T* │
-				//├───┴───┬───────┴───┐
-				//│   b   │ buffer T* │
-				//└───────┴───────────┘
-
-				const auto old_l {this->src->size()};
-				const auto new_l {old_l + (b - a)};
-
-				if (this->src->capacity() <= new_l)
-				{
-					this->src->capacity(new_l * 2);
-
-					head = this->src->__head__();
-					tail = this->src->__tail__();
-				}
-
-				detail::__rcopy__
-				(
-					&head[a],
-					&tail[0],
-					&head[b]
-				);
-				this->src->__size__(new_l);
-			}
-			else if (b < a)
-			{
-				//┌───────┬───────────┐
-				//│   a   │ buffer T* │
-				//├───┬───┴───────┬───┘
-				//│ b │ buffer T* │
-				//└───┴───────────┘
-
-				const auto old_l {this->src->size()};
-				const auto new_l {old_l - (a - b)};
-
-				// if (this->src->capacity() <= new_l)
-				// {
-				// 	this->src->capacity(new_l * 2);
-
-				// 	head = this->src->head();
-				// 	tail = this->src->tail();
-				// }
-
-				detail::__fcopy__
-				(
-					&head[a],
-					&tail[0],
-					&head[b]
-				);
-				this->src->__size__(new_l);
-			}
-			// write code point at ptr
-			Codec::encode(code, head, b);
-			break;
+			return *this;
 		}
 	}
 	return *this;
@@ -3626,12 +4012,12 @@ template <typename Codec /* can't own */> [[nodiscard]] constexpr txt<Codec>::re
 		{
 			__SHORTCUT__:
 
-			char32_t T_code;
+			char32_t code;
 
-			const auto T_size {Codec::next(head)};
-			Codec::decode(head, T_code, T_size);
+			const auto step {Codec::next(head)};
+			Codec::decode(head, code, step);
 
-			return T_code;
+			return code;
 		}
 	}
 	return U'\0';
@@ -3956,10 +4342,7 @@ template <size_t N> txt(const char16_t (&_)[N]) -> txt<codec<"UTF-16">>;
 template <size_t N> txt(const char32_t (&_)[N]) -> txt<codec<"UTF-32">>;
 }
 
-namespace std
-{
-
-template <typename Codec, typename Alloc> struct hash<utf::str<Codec, Alloc>>
+template <typename Codec, typename Alloc> struct std::hash<utf::str<Codec, Alloc>>
 {
 	constexpr auto operator()(const utf::str<Codec, Alloc>& str) const noexcept -> size_t
 	{
@@ -3973,7 +4356,7 @@ template <typename Codec, typename Alloc> struct hash<utf::str<Codec, Alloc>>
 	}
 };
 
-template <typename Codec /* can't own */> struct hash<utf::txt<Codec /*##*/>>
+template <typename Codec /* can't own */> struct std::hash<utf::txt<Codec /*##*/>>
 {
 	constexpr auto operator()(const utf::txt<Codec /*##*/>& str) const noexcept -> size_t
 	{
@@ -3987,4 +4370,8 @@ template <typename Codec /* can't own */> struct hash<utf::txt<Codec /*##*/>>
 	}
 };
 
-}
+template <typename Codec, typename Alloc>
+inline constexpr bool std::ranges::disable_sized_range<utf::str<Codec, Alloc>> = true;
+
+template <typename Codec /* can't own */>
+inline constexpr bool std::ranges::disable_sized_range<utf::txt<Codec /*##*/>> = true;
