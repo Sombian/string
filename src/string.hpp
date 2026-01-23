@@ -883,8 +883,8 @@ private:
 		// }
 		// ```
 		//
-		// in order to enable stl, iterator pair will be of the same type,
-		// however their behaviour will differ depends on underlying tags.
+		// in order to enable stl, iterator pair must be of the same type.
+		// on top of that, each end's behaviour must differ, and copy-safe.
 
 		struct state : std::enable_shared_from_this<state>
 		{
