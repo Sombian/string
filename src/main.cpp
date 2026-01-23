@@ -1,10 +1,12 @@
 #include <ranges>
+#include <vector>
 #include <variant>
 #include <iostream>
+#include <algorithm>
 
 #include "string.hpp"
 
-// #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #ifndef DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 int main() noexcept
@@ -13,14 +15,12 @@ int main() noexcept
 	std::system("chcp 65001 > NUL");
 	#endif//MSC_VER//############//;
 
-	{
-		utf::str str {u8"티라미수☆치즈케잌☆말차라떼"};
+	utf::str str {u8"티라미수☆치즈케잌☆말차라떼"};
 
-		for (auto code : str | std::views::reverse)
-		{
-			code = U'♥'; std::cout << str << '\n';
-			code = U'?'; std::cout << str << '\n';
-		}
+	for (auto code : str | std::views::reverse)
+	{
+		code = U'♥'; std::cout << str << '\n';
+		code = U'?'; std::cout << str << '\n';
 	}
 }
 
@@ -40,6 +40,21 @@ TEST_CASE("string")
 		CHECK(large.size() == large.capacity());
 	}
 
+	SUBCASE("index")
+	{
+		utf::utf8 str {u8"티라미수"};
+
+		using utf::range::N;
+
+		CHECK(str[0] == U'티');
+		CHECK(str[1] == U'라');
+		CHECK(str[2] == U'미');
+		CHECK(str[3] == U'수');
+
+		CHECK(str.substr(0, N) == str);
+		CHECK(str.substr(0, 4) == str);
+	}
+
 	SUBCASE("concat")
 	{
 		utf::utf8 티라 {u8"티라"};
@@ -52,7 +67,7 @@ TEST_CASE("string")
 		CHECK(미수.ends_with(u"미수"));
 
 		utf::utf8 티라미수 {u"티라" + 미수};
-		utf::utf8 티라티라 {u"티라" + 티라};
+		utf::utf8 티라티라 {티라 + u"티라"};
 
 		CHECK(티라미수 == u8"티라미수");
 		CHECK(티라미수.length() == 4);
@@ -83,19 +98,36 @@ TEST_CASE("string")
 		CHECK(str.match(str).size() == 1);
 	}
 
-	SUBCASE("index")
+	SUBCASE("range")
 	{
-		utf::utf8 str {u8"티라미수"};
+		utf::utf8 src {u8"티라미수"
+		               u8"☆"
+		               u8"치즈케잌"
+		               u8"☆"
+		               u8"말차라떼"};
 
-		using utf::range::N;
+		std::vector<char32_t> foo;
+		std::vector<char32_t> bar;
 
-		CHECK(str[0] == U'티');
-		CHECK(str[1] == U'라');
-		CHECK(str[2] == U'미');
-		CHECK(str[3] == U'수');
+		{
+			/*&*/ utf::str str {src};
 
-		CHECK(str.substr(0, N) == str);
-		CHECK(str.substr(0, 4) == str);
+			for (auto code : str | std::views::reverse)
+			{
+				foo.push_back(static_cast<char32_t>(code));
+			}
+		}
+		{
+			const utf::str str {src};
+
+			for (auto code : str | std::views::reverse)
+			{
+				bar.push_back(static_cast<char32_t>(code));
+			}
+		}
+
+		CHECK(std::ranges::equal(foo.begin(), foo.end(),
+		                         bar.begin(), bar.end()));
 	}
 }
 

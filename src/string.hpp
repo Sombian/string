@@ -67,7 +67,7 @@ inline auto operator<<(std::ostream& os, char32_t code) noexcept -> decltype(os)
 namespace utf
 {
 
-template <typename T, size_t N> using get_arg_t // extracts nth template argument from given T; amazingly useful
+template <typename T, size_t N> using get_arg_t // extracts nth template argument from given T; certainly useful
 =
 typename decltype([]<template <typename...> typename Type, typename... Args> (Type<Args...>*) consteval noexcept
 ->
@@ -110,7 +110,7 @@ template <size_t N> struct label { char str[N];
 auto operator<=>(const label&) const = default;
 constexpr label(const char (&str)[N]) noexcept
 { for (size_t i {0}; i < N; ++i) { this->str[i]
-= str[i]; } assert(this->str[N - 1] == 0); } };
+= str[i]; } /* non type template struct */ } };
 
 enum class range : uint8_t {N};
 struct clamp { const size_t _;
@@ -849,6 +849,8 @@ private:
 
 	template <typename Iterator> class cursor
 	{
+		friend str;
+
 		enum class it_offset_relative_tag : uint8_t
 		{
 			HEAD,
@@ -879,7 +881,7 @@ private:
 		//         return *temporal; // dangling
 		//     }
 		// }
-		//```
+		// ```
 		//
 		// in order to enable stl, iterator pair will be of the same type,
 		// however their behaviour will differ depends on underlying tags.
@@ -900,7 +902,7 @@ private:
 			class proxy
 			{
 				std::shared_ptr<state> common;
-				T*                     cursor;
+				T*                     needle;
 				it_offset_relative_tag offset_tag;
 				it_cursor_category_tag cursor_tag;
 
@@ -909,12 +911,12 @@ private:
 				constexpr proxy
 				(
 					decltype(common) common,
-					decltype(cursor) cursor,
+					decltype(needle) needle,
 					decltype(offset_tag) offset_tag,
 					decltype(cursor_tag) cursor_tag
 				)
 				noexcept : common {common},
-				           cursor {cursor},
+				           needle {needle},
 				           offset_tag {offset_tag},
 				           cursor_tag {cursor_tag} {}
 
@@ -925,8 +927,6 @@ private:
 				constexpr auto operator!=(char32_t code) const noexcept -> bool;
 			};
 		};
-
-		friend str;
 
 		std::shared_ptr<state> common;
 		size_t                 offset;
@@ -3731,8 +3731,8 @@ template <typename Codec, typename Alloc> template <typename Iterator> [[nodisca
 {
 	char32_t code;
 
-	switch (this->cursor_tag) { case it_cursor_category_tag::L__R: Codec::decode(this->cursor, code, Codec::next(this->cursor)); break;
-	                            case it_cursor_category_tag::R__L: Codec::decode(this->cursor, code, Codec::back(this->cursor)); break; }
+	switch (this->cursor_tag) { case it_cursor_category_tag::L__R: Codec::decode(this->needle, code, Codec::next(this->needle)); break;
+	                            case it_cursor_category_tag::R__L: Codec::decode(this->needle, code, Codec::back(this->needle)); break; }
 
 	return code;
 }
@@ -3746,19 +3746,19 @@ template <typename Codec, typename Alloc> template <typename Iterator> constexpr
 	{
 		case it_cursor_category_tag::L__R:
 		{
-			step = Codec::next(this->cursor);
+			step = Codec::next(this->needle);
 			break;
 		}
 		case it_cursor_category_tag::R__L:
 		{
-			step = Codec::back(this->cursor);
+			step = Codec::back(this->needle);
 			break;
 		}
 	}
 
 	const auto info {this->common->src
 	->
-	__insert__(this->cursor, code, step)};
+	__insert__(this->needle, code, step)};
 
 	// refresh ptr
 	switch (this->offset_tag)
@@ -3771,7 +3771,7 @@ template <typename Codec, typename Alloc> template <typename Iterator> constexpr
 				=
 				this->common->src->__head__();
 			}
-			this->cursor = info.reuse;
+			this->needle = info.reuse;
 			break;
 		}
 		case it_offset_relative_tag::TAIL:
@@ -3782,7 +3782,7 @@ template <typename Codec, typename Alloc> template <typename Iterator> constexpr
 				=
 				this->common->src->__tail__();
 			}
-			this->cursor = info.reuse;
+			this->needle = info.reuse;
 			break;
 		}
 	}
