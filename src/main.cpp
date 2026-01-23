@@ -9,20 +9,14 @@
 
 int main() noexcept
 {
-	{
-		utf::str str {u8"ABCDEFGHIJKLMNOPQRSTUVW"};
-
-		for (auto code : std::ranges::subrange(str.begin(), str.end()))
-		{
-			code = U'♥'; std::cout << str << '\n';
-			code = U'?'; std::cout << str << '\n';
-		}
-	}
+	#ifdef _MSC_VER//############//;
+	std::system("chcp 65001 > NUL");
+	#endif//MSC_VER//############//;
 
 	{
-		utf::str str {u8"ABCDEFGHIJKLMNOPQRSTUVW"};
+		utf::str str {u8"티라미수☆치즈케잌☆말차라떼"};
 
-		for (auto code : std::ranges::subrange(str.rbegin(), str.rend()))
+		for (auto code : str | std::views::reverse)
 		{
 			code = U'♥'; std::cout << str << '\n';
 			code = U'?'; std::cout << str << '\n';

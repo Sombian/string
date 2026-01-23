@@ -6,7 +6,7 @@
 [![stats](https://badgen.net/github/forks/Sombian/string)](https://github.com/Sombian/string)
 
 a header only string impl. requires C++23 or later.  
-🎉 *it is compatible with → `GCC`, `Clang`, `MSVC`*   
+🎉 *it is compatible with → `Clang`, `GCC`, `MSVC`*   
 
 ```c++
 #include "string.hpp"
