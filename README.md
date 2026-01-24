@@ -19,18 +19,33 @@ int main() noexcept
 }
 ```
 
-## `str`
+this impl encourages `error-as-value`, and explicitly forbids:  
+
+- **SILENT FAILURE**
+- **INVARIANT VIOLATION**
+- **UNDEFINED BEHAVIOUR**
+
+if a strict **O(1)** contract is necessary, please opt for the UTF-32 impl.  
+
+## overview
+
+| class | owns? | null-term? | use-after-free? |
+|:-----:|:-----:|:----------:|:---------------:|
+| `str` |   T   |   always   |       safe      |
+| `txt` |   F   |   maybe?   |      **UB**     |
+
+### `str`
 
 `str` is a struct that manages string content ownership.  
 it supports seamless conversion between any available encodings.  
 all its APIs are designed to accept strings of any supported encoding.  
 
-## `txt`
+### `txt`
 
 `txt` is a lightweight struct that holds a pointer (view) to a string.  
-similar to that of `str`, its APIs performs automatic transcoding if needed.  
+similar to that of `str`, its APIs performs transcoding, automatically.  
 
-## *Trivia*
+## tips & tricks
 
 code point random accessing is **O(N)** for variable-width encodings.  
 therefore, using an iterator is highly recommended for linear traversal.  

@@ -863,8 +863,8 @@ private:
 
 		enum class it_cursor_category_tag : uint8_t
 		{
-			L__R,
-			R__L,
+			LTOR,
+			RTOL,
 		};
 
 		using S = str;
@@ -3240,25 +3240,25 @@ template <size_t                       N> constexpr str<Codec, Alloc>::str(__32S
 template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::begin() /*&*/ noexcept -> forward_iterator
 {
 	return {this, this->__head__(), 0, (     0     ), forward_iterator::it_offset_relative_tag::HEAD,
-	                                                  forward_iterator::it_cursor_category_tag::L__R};
+	                                                  forward_iterator::it_cursor_category_tag::LTOR};
 }
 
 template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::end() /*&*/ noexcept -> forward_iterator
 {
 	return {this, this->__tail__(), 0, this->length(), forward_iterator::it_offset_relative_tag::TAIL,
-	                                                   forward_iterator::it_cursor_category_tag::L__R};
+	                                                   forward_iterator::it_cursor_category_tag::LTOR};
 }
 
 template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::rbegin() /*&*/ noexcept -> reverse_iterator
 {
 	return {this, this->__tail__(), 0, (     0     ), reverse_iterator::it_offset_relative_tag::TAIL,
-	                                                  reverse_iterator::it_cursor_category_tag::R__L};
+	                                                  reverse_iterator::it_cursor_category_tag::RTOL};
 }
 
 template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::rend() /*&*/ noexcept -> reverse_iterator
 {
 	return {this, this->__head__(), 0, this->length(), reverse_iterator::it_offset_relative_tag::HEAD,
-	                                                   reverse_iterator::it_cursor_category_tag::R__L};
+	                                                   reverse_iterator::it_cursor_category_tag::RTOL};
 }
 
 template <typename Codec, typename Alloc>
@@ -3638,8 +3638,17 @@ template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::__in
 
 template <typename Codec, typename Alloc> template <typename Iterator> constexpr auto str<Codec, Alloc>::cursor<Iterator>::operator*() const noexcept -> value_type
 {
-	switch (this->offset_tag) { case it_offset_relative_tag::HEAD: return {this->common, this->common->ptr + this->offset, this->offset_tag, this->cursor_tag};
-	                            case it_offset_relative_tag::TAIL: return {this->common, this->common->ptr - this->offset, this->offset_tag, this->cursor_tag}; }
+	switch (this->offset_tag)
+	{
+		case it_offset_relative_tag::HEAD:
+		{
+			return {this->common, this->common->ptr + this->offset, this->offset_tag, this->cursor_tag};
+		}
+		case it_offset_relative_tag::TAIL:
+		{
+			return {this->common, this->common->ptr - this->offset, this->offset_tag, this->cursor_tag};
+		}
+	}
 
 	assert(!"segfault");
 	std::unreachable();
@@ -3649,13 +3658,35 @@ template <typename Codec, typename Alloc> template <typename Iterator> constexpr
 {
 	T* ptr {this->common->ptr};
 
-	switch (this->offset_tag) { case it_offset_relative_tag::HEAD: ptr += this->offset; break;
-	                            case it_offset_relative_tag::TAIL: ptr -= this->offset; break; }
+	++this->weight;
 
-	switch (this->cursor_tag) { case it_cursor_category_tag::L__R: this->offset += Codec::next(ptr); break;
-	                            case it_cursor_category_tag::R__L: this->offset -= Codec::back(ptr); break; }
+	switch (this->offset_tag)
+	{
+		case it_offset_relative_tag::HEAD:
+		{
+			ptr += this->offset;
+			break;
+		}
+		case it_offset_relative_tag::TAIL:
+		{
+			ptr -= this->offset;
+			break;
+		}
+	}
 
-	/* count */ ++this->weight;
+	switch (this->cursor_tag)
+	{
+		case it_cursor_category_tag::LTOR:
+		{
+			this->offset += Codec::next(ptr);
+			break;
+		}
+		case it_cursor_category_tag::RTOL:
+		{
+			this->offset -= Codec::back(ptr);
+			break;
+		}
+	}
 
 	return static_cast<Iterator&>(*this);
 }
@@ -3671,13 +3702,35 @@ template <typename Codec, typename Alloc> template <typename Iterator> constexpr
 {
 	T* ptr {this->common->ptr};
 
-	switch (this->offset_tag) { case it_offset_relative_tag::HEAD: ptr += this->offset; break;
-	                            case it_offset_relative_tag::TAIL: ptr -= this->offset; break; }
+	--this->weight;
 
-	switch (this->cursor_tag) { case it_cursor_category_tag::L__R: this->offset -= Codec::back(ptr); break;
-	                            case it_cursor_category_tag::R__L: this->offset += Codec::next(ptr); break; }
+	switch (this->offset_tag)
+	{
+		case it_offset_relative_tag::HEAD:
+		{
+			ptr += this->offset;
+			break;
+		}
+		case it_offset_relative_tag::TAIL:
+		{
+			ptr -= this->offset;
+			break;
+		}
+	}
 
-	/* count */ --this->weight;
+	switch (this->cursor_tag)
+	{
+		case it_cursor_category_tag::LTOR:
+		{
+			this->offset -= Codec::back(ptr);
+			break;
+		}
+		case it_cursor_category_tag::RTOL:
+		{
+			this->offset += Codec::next(ptr);
+			break;
+		}
+	}
 
 	return static_cast<Iterator&>(*this);
 }
@@ -3723,21 +3776,39 @@ template <typename Codec, typename Alloc> template <typename Iterator> constexpr
 
 template <typename Codec, typename Alloc> template <typename Iterator> constexpr auto str<Codec, Alloc>::cursor<Iterator>::operator==(const Iterator& rhs) const noexcept -> bool
 {
-	return this->weight == rhs.weight && this->common->src == rhs.common->src;
+	// short-circuit; delay double ptr chasing
+
+	return this->weight == rhs.weight // delta
+	       &&
+	       this->common->src == rhs.common->src;
 }
 
 template <typename Codec, typename Alloc> template <typename Iterator> constexpr auto str<Codec, Alloc>::cursor<Iterator>::operator!=(const Iterator& rhs) const noexcept -> bool
 {
-	return this->weight != rhs.weight || this->common->src != rhs.common->src;
+	// short-circuit; delay double ptr chasing
+
+	return this->weight != rhs.weight // delta
+	       ||
+	       this->common->src != rhs.common->src;
 }
 
 template <typename Codec, typename Alloc> template <typename Iterator> [[nodiscard]] constexpr str<Codec, Alloc>::cursor<Iterator>::state::proxy::operator char32_t() const noexcept
 {
 	char32_t code;
 
-	switch (this->cursor_tag) { case it_cursor_category_tag::L__R: Codec::decode(this->needle, code, Codec::next(this->needle)); break;
-	                            case it_cursor_category_tag::R__L: Codec::decode(this->needle, code, Codec::back(this->needle)); break; }
-
+	switch (this->cursor_tag)
+	{
+		case it_cursor_category_tag::LTOR:
+		{
+			Codec::decode(this->needle, code, Codec::next(this->needle));
+			break;
+		}
+		case it_cursor_category_tag::RTOL:
+		{
+			Codec::decode(this->needle, code, Codec::back(this->needle));
+			break;
+		}
+	}
 	return code;
 }
 
@@ -3748,12 +3819,12 @@ template <typename Codec, typename Alloc> template <typename Iterator> constexpr
 	// examine way
 	switch (this->cursor_tag)
 	{
-		case it_cursor_category_tag::L__R:
+		case it_cursor_category_tag::LTOR:
 		{
 			step = Codec::next(this->needle);
 			break;
 		}
-		case it_cursor_category_tag::R__L:
+		case it_cursor_category_tag::RTOL:
 		{
 			step = Codec::back(this->needle);
 			break;
