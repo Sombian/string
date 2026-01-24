@@ -665,7 +665,6 @@ template <typename Codec, typename Alloc> class str : public API<str<Codec, Allo
 	static_assert(offsetof(buffer, head) == sizeof(size_t) * 0);
 	static_assert(offsetof(buffer, last) == sizeof(size_t) * 1);
 
-
 	typedef          void                                __assign__t;
 	typedef          void                                __concat__t;
 	typedef struct { bool shift; bool alloc; T* reuse; } __insert__t;
@@ -847,6 +846,7 @@ private:
 		constexpr auto operator!=(char32_t code) const noexcept -> bool;
 	};
 
+	// self-healing iterator; allows mutation
 	template <typename Iterator> class cursor
 	{
 		friend str;
@@ -3630,7 +3630,7 @@ template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::__in
 }
 
 #pragma endregion str
-#pragma region str::iterator_base
+#pragma region str::cursor
 
 template <typename Codec, typename Alloc> template <typename Iterator> constexpr auto str<Codec, Alloc>::cursor<Iterator>::operator*() const noexcept -> value_type
 {
@@ -3800,7 +3800,7 @@ template <typename Codec, typename Alloc> template <typename Iterator> constexpr
 	return this->operator char32_t() != code;
 }
 
-#pragma endregion str::mutable_itertor
+#pragma endregion str::cursor
 #pragma region str::reader
 
 template <typename Codec, typename Alloc> [[nodiscard]] constexpr str<Codec, Alloc>::reader::operator char32_t() const noexcept

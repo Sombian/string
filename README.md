@@ -6,7 +6,7 @@
 [![stats](https://badgen.net/github/forks/Sombian/string)](https://github.com/Sombian/string)
 
 a header only string impl. requires C++23 or later.  
-🎉 *it is compatible with → `Clang`, `GCC`, `MSVC`*   
+🎉 *compatible with: `Clang`, `GCC`, and `MSVC`*   
 
 ```c++
 #include "string.hpp"
@@ -21,20 +21,19 @@ int main() noexcept
 
 ## `str`
 
-`str` is a struct that owns the string content.  
-it can convert from, and to any available encoding encoded string.  
-likewise, all its API accepts any available encoding encoded string.  
+`str` is a struct that manages string content ownership.  
+it supports seamless conversion between any available encodings.  
+all its APIs are designed to accept strings of any supported encoding.  
 
 ## `txt`
 
-`txt` is a struct that holds ptr to the string.  
-it can convert from, and to any available encoding encoded string.  
-likewise, all its API accepts any available encoding encoded string.  
+`txt` is a lightweight struct that holds a pointer (view) to a string.  
+similar to that of `str`, its APIs performs automatic transcoding if needed.  
 
-## trivia
+## *Trivia*
 
-code point random accessing is **O(N)** for variable width encoding.  
-for this reason using an iterator is recommended for linear traversal.  
+code point random accessing is **O(N)** for variable-width encodings.  
+therefore, using an iterator is highly recommended for linear traversal.  
 
 ### ✔️ O(N)
 
@@ -65,27 +64,13 @@ for (int i {0}; i < len; ++i)
 }
 ```
 
-whilst all API works seamlessly with other available encoding encoded string,  
-its best to match the operand's encoding to that of lhs, for greater effciency.  
-
-### ✔️ std::memcpy
-
-```c++
-utf::utf8 str {u8"hello world"};
-```
-
-### ❌ transcoding
-
-```c++
-utf::utf8 str {u"hello world"};
-```
-
-likewise, its also important to cache `.length()` for variable width encoding.  
+likewise each `.length()` call is **O(N)** for variable-width encodings.  
+therefore, it is important to cache the result if frequent access is needed.  
 
 ### ✔️ O(N) * 1
 
 ```c++
-utf::utf8 str {u8"hello world"};
+utf::utf8 str {u8"마법소녀 마도카☆마기카"};
 
 const auto strlen {str.length()};
 
@@ -96,18 +81,36 @@ if (0 < strlen) { /*...*/ }
 ### ❌ O(N) * 2
 
 ```c++
-utf::utf8 str {u8"hello world"};
+utf::utf8 str {u8"마법소녀 마도카☆마기카"};
 
 if (0 < str.length()) { /*...*/ }
 if (0 < str.length()) { /*...*/ }
 ```
 
-if you need to substr that involves end of the string, consider using `range::N`.  
+whilst the API works seamlessly with different encodings out of the box,  
+its best to match the operand's encoding to that of lhs, for greater effciency.  
+
+### ✔️ std::memcpy
+
+```c++
+// utf8 to utf8
+utf::utf8 str {u8"마법소녀 마도카☆마기카"};
+```
+
+### ❌ transcoding
+
+```c++
+// utf16 to utf8
+utf::utf8 str {u"마법소녀 마도카☆마기카"};
+```
+
+if you need a substring that involves the end of the string, consider using `range::N`.  
+it acts as a sentinel value, which enables backward traversal, for that extra performance.  
 
 ### ✔️ walks backward
 
 ```c++
-utf::utf8 str {u8"hello world"};
+utf::utf8 str {u8"마법소녀 마도카☆마기카"};
 
 using range::N;
 
@@ -117,9 +120,36 @@ const auto txt {str.substr(0, N - 69)};
 ### ❌ walks forward
 
 ```c++
-utf::utf8 str {u8"hello world"};
+utf::utf8 str {u8"마법소녀 마도카☆마기카"};
 
 const auto N {str.length()};
 
 const auto txt {str.substr(0, N - 69)};
+```
+
+`str` supports self-healing iterators, which allows in-place code point mutation, during traversal.  
+**note**: self-healing has its limits however. any mutation that isnt done via proxy will result in *UB*.  
+
+### ✔️ safe mutation
+
+```c++
+utf::utf8 str {u8"마법소녀 마도카☆마기카"};
+
+for (auto code : str | std::views::reverse)
+{
+	code = U'♥'; // code unit * 3; shift [F]
+	code = U'?'; // code unit * 1; shift [T]
+}
+```
+
+### ❌ unsafe mutation
+
+```c++
+utf::utf8 str {u8"마법소녀 마도카☆마기카"};
+
+for (auto code : str | std::views::reverse)
+{
+	str = u8"hell world"; // corrupts iterator
+	str += u8"hell world"; // corrupts iterator
+}
 ```
