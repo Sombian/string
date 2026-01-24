@@ -19,6 +19,13 @@ int main() noexcept
 }
 ```
 
+## overview
+
+| class | owns? | null-term? | use-after-free? |
+|:-----:|:-----:|:----------:|:---------------:|
+| `str` |   T   |   always   |       safe      |
+| `txt` |   F   |   maybe?   |      **UB**     |
+
 this impl encourages `error-as-value`, and explicitly forbids:  
 
 - **SILENT FAILURE**
@@ -26,13 +33,6 @@ this impl encourages `error-as-value`, and explicitly forbids:
 - **UNDEFINED BEHAVIOUR**
 
 if a strict **O(1)** contract is necessary, please opt for the UTF-32 impl.  
-
-## overview
-
-| class | owns? | null-term? | use-after-free? |
-|:-----:|:-----:|:----------:|:---------------:|
-| `str` |   T   |   always   |       safe      |
-| `txt` |   F   |   maybe?   |      **UB**     |
 
 ### `str`
 
@@ -79,6 +79,8 @@ for (int i {0}; i < len; ++i)
 }
 ```
 
+---
+
 likewise each `.length()` call is **O(N)** for variable-width encodings.  
 therefore, it is important to cache the result if frequent access is needed.  
 
@@ -102,6 +104,8 @@ if (0 < str.length()) { /*...*/ }
 if (0 < str.length()) { /*...*/ }
 ```
 
+---
+
 whilst the API works seamlessly with different encodings out of the box,  
 its best to match the operand's encoding to that of lhs, for greater efficiency.  
 
@@ -118,6 +122,8 @@ utf::utf8 str {u8"마법소녀 마도카☆마기카"};
 // utf16 to utf8
 utf::utf8 str {u"마법소녀 마도카☆마기카"};
 ```
+
+---
 
 if you need a substring that involves the end of the string, consider using `range::N`.  
 it acts as a sentinel value, which enables backward traversal, for that extra performance.  
