@@ -1035,11 +1035,10 @@ public:
 		// maybe mark it as unsafe..?
 	}
 
-	template <typename Other,
-	          typename Arena>
+	template <typename Arena>
 	constexpr txt
 	(
-		const str<Other, Arena>& str
+		const str<Codec, Arena>& str
 	)
 	noexcept : __head__ {str.__head__()},
 	           __tail__ {str.__tail__()}
@@ -1047,11 +1046,10 @@ public:
 		// nothing to do...
 	}
 
-	template <typename Other,
-	          typename Arena>
+	template <typename Arena>
 	constexpr txt
 	(
-		/*&*/ str<Other, Arena>& str
+		/*&*/ str<Codec, Arena>& str
 	)
 	noexcept : __head__ {str.__head__()},
 	           __tail__ {str.__tail__()}
