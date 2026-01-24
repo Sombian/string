@@ -128,8 +128,9 @@ template <label> struct codec
 // https://en.wikipedia.org/wiki/ASCII
 template <> struct codec<"ASCII">
 {
-	static constexpr const bool variable {false};
-	static constexpr const bool stateful {false};
+	static constexpr const bool is_variable {static_cast<bool>(0)};
+	static constexpr const bool is_stateful {static_cast<bool>(0)};
+	static constexpr const bool is_backable {static_cast<bool>(1)};
 
 	typedef char T;
 
@@ -148,8 +149,9 @@ template <> struct codec<"ASCII">
 // https://en.wikipedia.org/wiki/UTF-8
 template <> struct codec<"UTF-8">
 {
-	static constexpr const bool variable {true};
-	static constexpr const bool stateful {false};
+	static constexpr const bool is_variable {static_cast<bool>(1)};
+	static constexpr const bool is_stateful {static_cast<bool>(0)};
+	static constexpr const bool is_backable {static_cast<bool>(1)};
 
 	typedef char8_t T;
 
@@ -168,8 +170,9 @@ template <> struct codec<"UTF-8">
 // https://en.wikipedia.org/wiki/UTF-16
 template <> struct codec<"UTF-16">
 {
-	static constexpr const bool variable {true};
-	static constexpr const bool stateful {false};
+	static constexpr const bool is_variable {static_cast<bool>(1)};
+	static constexpr const bool is_stateful {static_cast<bool>(0)};
+	static constexpr const bool is_backable {static_cast<bool>(1)};
 
 	typedef char16_t T;
 
@@ -188,8 +191,9 @@ template <> struct codec<"UTF-16">
 // https://en.wikipedia.org/wiki/UTF-32
 template <> struct codec<"UTF-32">
 {
-	static constexpr const bool variable {false};
-	static constexpr const bool stateful {false};
+	static constexpr const bool is_variable {static_cast<bool>(0)};
+	static constexpr const bool is_stateful {static_cast<bool>(0)};
+	static constexpr const bool is_backable {static_cast<bool>(1)};
 
 	typedef char32_t T;
 
@@ -2244,12 +2248,12 @@ template <typename Codec> constexpr auto detail::__difcu__(const typename Codec:
 {
 	typedef typename Codec::T T;
 
-	if constexpr (Codec::variable)
+	if constexpr (Codec::is_variable)
 	{
 		return tail - head;
 	}
 
-	if constexpr (!Codec::variable)
+	if constexpr (!Codec::is_variable)
 	{
 		return tail - head;
 	}
@@ -2259,7 +2263,7 @@ template <typename Codec> constexpr auto detail::__difcp__(const typename Codec:
 {
 	typedef typename Codec::T T;
 
-	if constexpr (Codec::variable)
+	if constexpr (Codec::is_variable)
 	{
 		size_t out {0};
 
@@ -2268,7 +2272,7 @@ template <typename Codec> constexpr auto detail::__difcp__(const typename Codec:
 		return out;
 	}
 
-	if constexpr (!Codec::variable)
+	if constexpr (!Codec::is_variable)
 	{
 		size_t out {0};
 
@@ -3810,9 +3814,9 @@ template <typename Codec, typename Alloc> [[nodiscard]] constexpr str<Codec, All
 
 	size_t i {0};
 
-	if constexpr (!Codec::variable
+	if constexpr (!Codec::is_variable
 	              &&
-	              !Codec::stateful)
+	              !Codec::is_stateful)
 	{
 		if (this->arg < this->src->size())
 		{
@@ -3859,9 +3863,9 @@ template <typename Codec, typename Alloc> constexpr auto str<Codec, Alloc>::writ
 
 	size_t i {0};
 
-	if constexpr (!Codec::variable
+	if constexpr (!Codec::is_variable
 	              &&
-	              !Codec::stateful)
+	              !Codec::is_stateful)
 	{
 		if (this->arg < this->src->size())
 		{
@@ -3911,9 +3915,9 @@ template <typename Codec /* can't own */> [[nodiscard]] constexpr txt<Codec>::re
 
 	size_t i {0};
 
-	if constexpr (!Codec::variable
+	if constexpr (!Codec::is_variable
 	              &&
-	              !Codec::stateful)
+	              !Codec::is_stateful)
 	{
 		if (this->arg < this->src->size())
 		{

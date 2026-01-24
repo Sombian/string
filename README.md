@@ -88,7 +88,7 @@ if (0 < str.length()) { /*...*/ }
 ```
 
 whilst the API works seamlessly with different encodings out of the box,  
-its best to match the operand's encoding to that of lhs, for greater effciency.  
+its best to match the operand's encoding to that of lhs, for greater efficiency.  
 
 ### ✔️ std::memcpy
 
