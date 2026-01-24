@@ -608,7 +608,7 @@ template <typename Codec, typename Alloc> class str : public API<str<Codec, Allo
 	//┌───────────────────────────┐
 	//│           small           │
 	//├──────┬──────┬──────┬──────┤
-	//│ head │ tail │ size │ meta │
+	//│ head │ last │ size │ meta │
 	//├──────┴──────┴──────┴──────┤
 	//│           bytes           │
 	//└───────────────────────────┘
@@ -634,7 +634,6 @@ template <typename Codec, typename Alloc> class str : public API<str<Codec, Allo
 
 		// single source of truth; category.
 		constexpr auto mode() const noexcept -> mode_t;
-		// single source of truth; category.
 		constexpr auto mode() /*&*/ noexcept -> mode_t;
 	};
 
