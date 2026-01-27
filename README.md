@@ -152,16 +152,17 @@ const auto txt {str.substr(0, N - 69)};
 
 `str` supports self-healing iterators, which allows in-place code point mutation, during traversal.  
 **note**: self-healing has its limits. any mutation that isnt done by *current* proxy will result in **UB**.  
+*to be more precise, mutation that doesn't alter past code point is safe, whether that be via proxy or not*  
 
 ### ✔️ safe mutation
 
 ```c++
 utf::utf8 str {u8"마법소녀 마도카☆마기카"};
 
-for (auto code : str | std::views::reverse)
+for (auto code : str)
 {
-	code = U'♥'; // code unit * 3; shift [F]
-	code = U'?'; // code unit * 1; shift [T]
+	code = U'♥'; // ❌ buffer shift
+	code = U'?'; // ✔️ buffer shift
 }
 ```
 
@@ -170,9 +171,19 @@ for (auto code : str | std::views::reverse)
 ```c++
 utf::utf8 str {u8"마법소녀 마도카☆마기카"};
 
-for (auto code : str | std::views::reverse)
+for (auto code : str)
 {
-	str = u8"hell world"; // corrupts iterator
-	str += u8"hell world"; // corrupts iterator
+	// technically safe
+	str = u8"마법소녀 마도카☆마기카";
+	// canonically unsafe
+	str = u8"기적도, 마법도, 있어..!";
+
+	if (...)
+	{
+		// technically safe
+		*this->begin() = U'♥'; // ❌ buffer shift
+		// canonically unsafe
+		*this->begin() = U'?'; // ✔️ buffer shift
+	}
 }
 ```

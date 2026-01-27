@@ -443,9 +443,7 @@ private:
 		)
 		noexcept : lhs {lhs},
 		           rhs {rhs}
-		{
-			// nothing to do...
-		}
+		{}
 
 		template <typename Other, typename Arena>
 		constexpr operator str<Other, Arena>() const noexcept;
@@ -499,7 +497,8 @@ private:
 		(
 			decltype(ptr) ptr
 		)
-		noexcept : ptr {ptr} {}
+		noexcept : ptr {ptr}
+		{}
 
 		// stl compat; must be default constructible
 		constexpr  const_forward_iterator() noexcept = default;
@@ -539,7 +538,8 @@ private:
 		(
 			decltype(ptr) ptr
 		)
-		noexcept : ptr {ptr} {}
+		noexcept : ptr {ptr}
+		{}
 
 		// stl compat; must be default constructible
 		constexpr  const_reverse_iterator() noexcept = default;
@@ -813,9 +813,7 @@ private:
 		)
 		noexcept : src {src},
 		           arg {arg}
-		{
-			// nothing to do...
-		}
+		{}
 
 		[[nodiscard]] constexpr operator char32_t() const noexcept;
 
@@ -837,9 +835,7 @@ private:
 		)
 		noexcept : src {src},
 		           arg {arg}
-		{
-			// nothing to do...
-		}
+		{}
 
 		constexpr auto operator=(char32_t code) noexcept -> writer&;
 		
@@ -900,7 +896,8 @@ private:
 				decltype(ptr) ptr
 			)
 			noexcept : src {src},
-			           ptr {ptr} {}
+			           ptr {ptr}
+			{}
 
 			class proxy
 			{
@@ -921,7 +918,8 @@ private:
 				noexcept : common {common},
 				           needle {needle},
 				           offset_tag {offset_tag},
-				           cursor_tag {cursor_tag} {}
+				           cursor_tag {cursor_tag}
+				{}
 
 				[[nodiscard]] constexpr operator char32_t() const noexcept;
 				constexpr auto operator=(char32_t code) noexcept -> proxy&;
@@ -958,7 +956,8 @@ private:
 		           offset {offset},
 		           weight {weight},
 		           offset_tag {offset_tag},
-		           cursor_tag {cursor_tag} {}
+		           cursor_tag {cursor_tag}
+		{}
 
 		// stl compat; must be default constructible
 		constexpr  cursor() noexcept = default;
@@ -1009,9 +1008,7 @@ public:
 	)
 	noexcept : __head__ {head},
 	           __tail__ {tail}
-	{
-		// nothing to do...
-	}
+	{}
 
 	template <size_t N>
 	constexpr txt
@@ -1020,9 +1017,7 @@ public:
 	)
 	noexcept : __head__ {&str[N - N]},
 	           __tail__ {&str[N - 1]}
-	{
-		// nothing to do...
-	}
+	{}
 
 	template <size_t N>
 	constexpr txt
@@ -1031,9 +1026,7 @@ public:
 	)
 	noexcept : __head__ {&str[N - N]},
 	           __tail__ {&str[N - 1]}
-	{
-		// maybe mark it as unsafe..?
-	}
+	{}
 
 	template <typename Arena>
 	constexpr txt
@@ -1042,9 +1035,7 @@ public:
 	)
 	noexcept : __head__ {str.__head__()},
 	           __tail__ {str.__tail__()}
-	{
-		// nothing to do...
-	}
+	{}
 
 	template <typename Arena>
 	constexpr txt
@@ -1053,9 +1044,7 @@ public:
 	)
 	noexcept : __head__ {str.__head__()},
 	           __tail__ {str.__tail__()}
-	{
-		// maybe mark it as unsafe..?
-	}
+	{}
 
 	COPY_CONSTRUCTOR(txt) = default;
 	MOVE_CONSTRUCTOR(txt) = default;
@@ -1082,9 +1071,7 @@ private:
 		)
 		noexcept : src {src},
 		           arg {arg}
-		{
-			// nothing to do...
-		}
+		{}
 
 		[[nodiscard]] constexpr operator char32_t() const noexcept;
 
@@ -1106,9 +1093,7 @@ private:
 		)
 		noexcept : src {src},
 		           arg {arg}
-		{
-			// nothing to do...
-		}
+		{}
 
 		// constexpr auto operator=(char32_t code) noexcept -> writer&;
 		
@@ -2288,13 +2273,12 @@ template <typename Codec,
 
 	if constexpr (std::is_same_v<Codec, Other>)
 	{
-		const U* ptr {head};
-		/*&*/ T* out {dest};
-
-		for (; ptr <= tail; ++ptr, ++out)
-		{
-			*out = *ptr;
-		}
+		std::ranges::copy/*forward*/
+		(
+			head,
+			tail,
+			dest
+		);
 
 		return __difcu__<Codec>(head, tail);
 	}
@@ -2341,13 +2325,12 @@ template <typename Codec,
 
 	if constexpr (std::is_same_v<Codec, Other>)
 	{
-		const U* ptr {head + (tail - head)};
-		/*&*/ T* out {dest + (tail - head)};
-
-		for (; head <= ptr; --ptr, --out)
-		{
-			*out = *ptr;
-		}
+		std::ranges::copy_backward
+		(
+			head,
+			tail,
+			dest
+		);
 
 		return __difcu__<Codec>(head, tail);
 	}
